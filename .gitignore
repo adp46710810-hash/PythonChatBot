@@ -1,0 +1,16 @@
+.env
+.tio.tokens.json
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+tests/tmp*/
+
+# Local data and backups
+botdata.json
+data/runtime/
+バックアップ/
+
+# Tooling output
+layerdivider/output/

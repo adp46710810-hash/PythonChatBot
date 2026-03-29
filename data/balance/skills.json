@@ -1,0 +1,827 @@
+{
+  "starter_battle_cry": {
+    "name": "闘気",
+    "type": "passive",
+    "slot": "passive_1",
+    "initial_unlocked": true,
+    "sort_order": 10,
+    "description": "常時ATKを強化する初期パッシブスキル",
+    "aliases": ["battle_cry", "atk", "こうげき", "とうき", "闘魂"],
+    "infinite_growth": {
+      "description_template": "常時ATK+{atk_bonus}",
+      "atk_bonus_step": 2,
+      "upgrade_cost_steps": {
+        "skill_book": 1
+      }
+    },
+    "levels": [
+      {
+        "description": "常時ATK+4",
+        "atk_bonus": 4,
+        "upgrade_costs": {}
+      },
+      {
+        "description": "常時ATK+6",
+        "atk_bonus": 6,
+        "upgrade_costs": {
+          "skill_book": 1
+        }
+      },
+      {
+        "description": "常時ATK+8",
+        "atk_bonus": 8,
+        "upgrade_costs": {
+          "skill_book": 2
+        }
+      },
+      {
+        "description": "常時ATK+10",
+        "atk_bonus": 10,
+        "upgrade_costs": {
+          "skill_book": 3
+        }
+      },
+      {
+        "description": "常時ATK+12",
+        "atk_bonus": 12,
+        "upgrade_costs": {
+          "skill_book": 4
+        }
+      },
+      {
+        "description": "常時ATK+14",
+        "atk_bonus": 14,
+        "upgrade_costs": {
+          "skill_book": 5
+        }
+      }
+    ]
+  },
+  "starter_iron_guard": {
+    "name": "鉄壁",
+    "type": "passive",
+    "slot": "passive_2",
+    "initial_unlocked": true,
+    "sort_order": 20,
+    "description": "常時DEFを強化する防御パッシブスキル",
+    "aliases": ["iron_guard", "guard", "def", "てっぺき", "ぼうぎょ"],
+    "infinite_growth": {
+      "description_template": "常時DEF+{def_bonus}",
+      "def_bonus_step": 2,
+      "upgrade_cost_steps": {
+        "skill_book": 1
+      }
+    },
+    "levels": [
+      {
+        "description": "常時DEF+3",
+        "def_bonus": 3,
+        "upgrade_costs": {}
+      },
+      {
+        "description": "常時DEF+5",
+        "def_bonus": 5,
+        "upgrade_costs": {
+          "skill_book": 1
+        }
+      },
+      {
+        "description": "常時DEF+7",
+        "def_bonus": 7,
+        "upgrade_costs": {
+          "skill_book": 2
+        }
+      },
+      {
+        "description": "常時DEF+10",
+        "def_bonus": 10,
+        "upgrade_costs": {
+          "skill_book": 3
+        }
+      },
+      {
+        "description": "常時DEF+12",
+        "def_bonus": 12,
+        "upgrade_costs": {
+          "skill_book": 4
+        }
+      },
+      {
+        "description": "常時DEF+14",
+        "def_bonus": 14,
+        "upgrade_costs": {
+          "skill_book": 5
+        }
+      }
+    ]
+  },
+  "active_dormadakia": {
+    "name": "ドルマダキア",
+    "type": "active",
+    "slot": "active_1",
+    "initial_unlocked": false,
+    "sort_order": 110,
+    "description": "通常攻撃に倍率をかけた少し強い一撃",
+    "aliases": ["dormadakia", "どるまだきあ", "ドルマ"],
+    "levels": [
+      {
+        "description": "通常攻撃1.35倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 3,
+        "attack_multiplier": 1.35,
+        "upgrade_costs": {
+          "skill_book": 2
+        }
+      },
+      {
+        "description": "通常攻撃1.4倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 3,
+        "attack_multiplier": 1.4,
+        "upgrade_costs": {
+          "skill_book": 2
+        }
+      },
+      {
+        "description": "通常攻撃1.45倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 3,
+        "attack_multiplier": 1.45,
+        "upgrade_costs": {
+          "skill_book": 3
+        }
+      },
+      {
+        "description": "通常攻撃1.5倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 3,
+        "attack_multiplier": 1.5,
+        "upgrade_costs": {
+          "skill_book": 3
+        }
+      },
+      {
+        "description": "通常攻撃1.55倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 3,
+        "attack_multiplier": 1.55,
+        "upgrade_costs": {
+          "skill_book": 3
+        }
+      },
+      {
+        "description": "通常攻撃1.6倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 2,
+        "attack_multiplier": 1.6,
+        "upgrade_costs": {
+          "skill_book": 4
+        }
+      },
+      {
+        "description": "通常攻撃1.65倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 2,
+        "attack_multiplier": 1.65,
+        "upgrade_costs": {
+          "skill_book": 4
+        }
+      },
+      {
+        "description": "通常攻撃1.7倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 2,
+        "attack_multiplier": 1.7,
+        "upgrade_costs": {
+          "skill_book": 4
+        }
+      },
+      {
+        "description": "通常攻撃1.75倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 2,
+        "attack_multiplier": 1.75,
+        "upgrade_costs": {
+          "skill_book": 5
+        }
+      },
+      {
+        "description": "通常攻撃1.8倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 2,
+        "attack_multiplier": 1.8,
+        "upgrade_costs": {
+          "skill_book": 5
+        }
+      },
+      {
+        "description": "通常攻撃1.85倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 2,
+        "attack_multiplier": 1.85,
+        "upgrade_costs": {
+          "skill_book": 5
+        }
+      },
+      {
+        "description": "通常攻撃1.9倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 2,
+        "attack_multiplier": 1.9,
+        "upgrade_costs": {
+          "skill_book": 6
+        }
+      },
+      {
+        "description": "通常攻撃1.95倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 2,
+        "attack_multiplier": 1.95,
+        "upgrade_costs": {
+          "skill_book": 6
+        }
+      },
+      {
+        "description": "通常攻撃2倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 1,
+        "attack_multiplier": 2.0,
+        "upgrade_costs": {
+          "skill_book": 6
+        }
+      },
+      {
+        "description": "通常攻撃2.05倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 1,
+        "attack_multiplier": 2.05,
+        "upgrade_costs": {
+          "skill_book": 7
+        }
+      },
+      {
+        "description": "通常攻撃2.1倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 1,
+        "attack_multiplier": 2.1,
+        "upgrade_costs": {
+          "skill_book": 7
+        }
+      },
+      {
+        "description": "通常攻撃2.15倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 1,
+        "attack_multiplier": 2.15,
+        "upgrade_costs": {
+          "skill_book": 8
+        }
+      },
+      {
+        "description": "通常攻撃2.2倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 1,
+        "attack_multiplier": 2.2,
+        "upgrade_costs": {
+          "skill_book": 8
+        }
+      },
+      {
+        "description": "通常攻撃2.25倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 1,
+        "attack_multiplier": 2.25,
+        "upgrade_costs": {
+          "skill_book": 9
+        }
+      },
+      {
+        "description": "通常攻撃2.3倍",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 1,
+        "attack_multiplier": 2.3,
+        "upgrade_costs": {
+          "skill_book": 10
+        }
+      }
+    ]
+  },
+  "active_rundan": {
+    "name": "ルンダン",
+    "type": "active",
+    "slot": "active_2",
+    "target": "self",
+    "deals_damage": true,
+    "initial_unlocked": false,
+    "sort_order": 120,
+    "description": "斬りつけつつ行動ゲージを追加して手数を増やすアクティブスキル",
+    "aliases": ["rundan", "るんだん"],
+    "levels": [
+      {
+        "description": "攻x0.50 / 行動ゲージ+100",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 4,
+        "attack_multiplier": 0.5,
+        "action_gauge_bonus": 100,
+        "upgrade_costs": {
+          "skill_book": 2
+        }
+      },
+      {
+        "description": "攻x0.52 / 行動ゲージ+110",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 4,
+        "attack_multiplier": 0.52,
+        "action_gauge_bonus": 110,
+        "upgrade_costs": {
+          "skill_book": 2
+        }
+      },
+      {
+        "description": "攻x0.54 / 行動ゲージ+120",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 4,
+        "attack_multiplier": 0.54,
+        "action_gauge_bonus": 120,
+        "upgrade_costs": {
+          "skill_book": 3
+        }
+      },
+      {
+        "description": "攻x0.56 / 行動ゲージ+130",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 4,
+        "attack_multiplier": 0.56,
+        "action_gauge_bonus": 130,
+        "upgrade_costs": {
+          "skill_book": 3
+        }
+      },
+      {
+        "description": "攻x0.58 / 行動ゲージ+140",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 3,
+        "attack_multiplier": 0.58,
+        "action_gauge_bonus": 140,
+        "upgrade_costs": {
+          "skill_book": 3
+        }
+      },
+      {
+        "description": "攻x0.60 / 行動ゲージ+150",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 3,
+        "attack_multiplier": 0.6,
+        "action_gauge_bonus": 150,
+        "upgrade_costs": {
+          "skill_book": 4
+        }
+      },
+      {
+        "description": "攻x0.62 / 行動ゲージ+160",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 3,
+        "attack_multiplier": 0.62,
+        "action_gauge_bonus": 160,
+        "upgrade_costs": {
+          "skill_book": 4
+        }
+      },
+      {
+        "description": "攻x0.64 / 行動ゲージ+170",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 3,
+        "attack_multiplier": 0.64,
+        "action_gauge_bonus": 170,
+        "upgrade_costs": {
+          "skill_book": 4
+        }
+      },
+      {
+        "description": "攻x0.66 / 行動ゲージ+180",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 3,
+        "attack_multiplier": 0.66,
+        "action_gauge_bonus": 180,
+        "upgrade_costs": {
+          "skill_book": 5
+        }
+      },
+      {
+        "description": "攻x0.68 / 行動ゲージ+190",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 3,
+        "attack_multiplier": 0.68,
+        "action_gauge_bonus": 190,
+        "upgrade_costs": {
+          "skill_book": 5
+        }
+      },
+      {
+        "description": "攻x0.70 / 行動ゲージ+200",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 3,
+        "attack_multiplier": 0.7,
+        "action_gauge_bonus": 200,
+        "upgrade_costs": {
+          "skill_book": 6
+        }
+      },
+      {
+        "description": "攻x0.72 / 行動ゲージ+210",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 3,
+        "attack_multiplier": 0.72,
+        "action_gauge_bonus": 210,
+        "upgrade_costs": {
+          "skill_book": 6
+        }
+      },
+      {
+        "description": "攻x0.74 / 行動ゲージ+220",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 2,
+        "attack_multiplier": 0.74,
+        "action_gauge_bonus": 220,
+        "upgrade_costs": {
+          "skill_book": 7
+        }
+      },
+      {
+        "description": "攻x0.76 / 行動ゲージ+230",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 2,
+        "attack_multiplier": 0.76,
+        "action_gauge_bonus": 230,
+        "upgrade_costs": {
+          "skill_book": 7
+        }
+      },
+      {
+        "description": "攻x0.78 / 行動ゲージ+240",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 2,
+        "attack_multiplier": 0.78,
+        "action_gauge_bonus": 240,
+        "upgrade_costs": {
+          "skill_book": 8
+        }
+      },
+      {
+        "description": "攻x0.80 / 行動ゲージ+250",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 2,
+        "attack_multiplier": 0.8,
+        "action_gauge_bonus": 250,
+        "upgrade_costs": {
+          "skill_book": 8
+        }
+      },
+      {
+        "description": "攻x0.82 / 行動ゲージ+260",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 2,
+        "attack_multiplier": 0.82,
+        "action_gauge_bonus": 260,
+        "upgrade_costs": {
+          "skill_book": 9
+        }
+      },
+      {
+        "description": "攻x0.84 / 行動ゲージ+270",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 2,
+        "attack_multiplier": 0.84,
+        "action_gauge_bonus": 270,
+        "upgrade_costs": {
+          "skill_book": 10
+        }
+      },
+      {
+        "description": "攻x0.86 / 行動ゲージ+280",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 2,
+        "attack_multiplier": 0.86,
+        "action_gauge_bonus": 280,
+        "upgrade_costs": {
+          "skill_book": 11
+        }
+      },
+      {
+        "description": "攻x0.88 / 行動ゲージ+290",
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 2,
+        "attack_multiplier": 0.88,
+        "action_gauge_bonus": 290,
+        "upgrade_costs": {
+          "skill_book": 12
+        }
+      }
+    ]
+  },
+  "passive_hayate": {
+    "name": "疾風",
+    "type": "passive",
+    "slot": "passive_3",
+    "initial_unlocked": false,
+    "sort_order": 30,
+    "max_level": 20,
+    "description": "常時SPDを強化する速度パッシブスキル",
+    "aliases": ["hayate", "しっぷう", "疾風", "迅雷"],
+    "levels": [
+      {
+        "description": "常時SPD+8",
+        "speed_bonus": 8,
+        "upgrade_costs": {
+          "skill_book": 2
+        }
+      }
+    ],
+    "infinite_growth": {
+      "description_template": "常時SPD+{speed_bonus}",
+      "speed_bonus_step": 2,
+      "upgrade_cost_steps": {
+        "skill_book": 1
+      }
+    }
+  },
+  "passive_life_pulse": {
+    "name": "生命脈動",
+    "type": "passive",
+    "slot": "passive_4",
+    "initial_unlocked": false,
+    "sort_order": 40,
+    "max_level": 20,
+    "description": "常時MaxHPを強化する耐久パッシブスキル",
+    "aliases": ["lifepulse", "せいめいみゃくどう", "生命脈動"],
+    "levels": [
+      {
+        "description": "常時HP+12",
+        "max_hp_bonus": 12,
+        "upgrade_costs": {
+          "skill_book": 2
+        }
+      }
+    ],
+    "infinite_growth": {
+      "description_template": "常時HP+{max_hp_bonus}",
+      "max_hp_bonus_step": 2,
+      "upgrade_cost_steps": {
+        "skill_book": 1
+      }
+    }
+  },
+  "active_crimson_focus": {
+    "name": "紅蓮集中",
+    "type": "active",
+    "slot": "active_3",
+    "target": "self",
+    "deals_damage": false,
+    "initial_unlocked": false,
+    "sort_order": 130,
+    "max_level": 20,
+    "description": "自身のATKを高める火力強化アクティブスキル",
+    "aliases": ["crimsonfocus", "ぐれんしゅうちゅう", "紅蓮集中"],
+    "levels": [
+      {
+        "description": "ATK+8 x2T / CT5",
+        "atk_bonus": 8,
+        "duration_turns": 2,
+        "duration_ticks": 2,
+        "cooldown_actions": 5,
+        "upgrade_costs": {
+          "skill_book": 2
+        }
+      }
+    ],
+    "infinite_growth": {
+      "description_template": "ATK+{atk_bonus} x{duration_turns}T / CT{cooldown_actions}",
+      "atk_bonus_step": 1,
+      "cooldown_actions_step": -1,
+      "cooldown_actions_every": 10,
+      "upgrade_cost_steps": {
+        "skill_book": 1
+      }
+    }
+  },
+  "active_citadel_guard": {
+    "name": "城塞防陣",
+    "type": "active",
+    "slot": "active_4",
+    "target": "self",
+    "deals_damage": false,
+    "initial_unlocked": false,
+    "sort_order": 140,
+    "max_level": 20,
+    "description": "自身のDEFを高める防御強化アクティブスキル",
+    "aliases": ["citadelguard", "じょうさいぼうじん", "城塞防陣"],
+    "levels": [
+      {
+        "description": "DEF+8 x2T / CT5",
+        "def_bonus": 8,
+        "duration_turns": 2,
+        "duration_ticks": 2,
+        "cooldown_actions": 5,
+        "upgrade_costs": {
+          "skill_book": 2
+        }
+      }
+    ],
+    "infinite_growth": {
+      "description_template": "DEF+{def_bonus} x{duration_turns}T / CT{cooldown_actions}",
+      "def_bonus_step": 1,
+      "cooldown_actions_step": -1,
+      "cooldown_actions_every": 10,
+      "upgrade_cost_steps": {
+        "skill_book": 1
+      }
+    }
+  },
+  "active_thunder_stride": {
+    "name": "迅雷歩法",
+    "type": "active",
+    "slot": "active_5",
+    "target": "self",
+    "deals_damage": false,
+    "initial_unlocked": false,
+    "sort_order": 150,
+    "max_level": 20,
+    "description": "自身のSPDを大きく高める加速アクティブスキル",
+    "aliases": ["thunderstride", "じんらいほほう", "迅雷歩法", "迅雷"],
+    "levels": [
+      {
+        "description": "SPD+15 x2T / CT5",
+        "speed_bonus": 15,
+        "duration_turns": 2,
+        "duration_ticks": 2,
+        "cooldown_actions": 5,
+        "upgrade_costs": {
+          "skill_book": 2
+        }
+      }
+    ],
+    "infinite_growth": {
+      "description_template": "SPD+{speed_bonus} x{duration_turns}T / CT{cooldown_actions}",
+      "speed_bonus_step": 3,
+      "cooldown_actions_step": -1,
+      "cooldown_actions_every": 10,
+      "upgrade_cost_steps": {
+        "skill_book": 1
+      }
+    }
+  },
+  "active_siege_break": {
+    "name": "破城一閃",
+    "type": "active",
+    "slot": "active_6",
+    "initial_unlocked": false,
+    "sort_order": 160,
+    "max_level": 20,
+    "description": "高倍率単発で大ダメージを狙う重撃アクティブスキル",
+    "aliases": ["siegebreak", "はじょういっせん", "破城一閃"],
+    "levels": [
+      {
+        "description": "攻x2.00 / CT6",
+        "attack_multiplier": 2.0,
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 6,
+        "upgrade_costs": {
+          "skill_book": 3
+        }
+      }
+    ],
+    "infinite_growth": {
+      "description_template": "攻x{attack_multiplier:.2f} / CT{cooldown_actions}",
+      "attack_multiplier_step": 0.06,
+      "cooldown_actions_step": -1,
+      "cooldown_actions_every": 10,
+      "upgrade_cost_steps": {
+        "skill_book": 1
+      }
+    }
+  },
+  "active_rekko_dan": {
+    "name": "裂甲断",
+    "type": "active",
+    "slot": "active_8",
+    "initial_unlocked": false,
+    "sort_order": 165,
+    "max_level": 20,
+    "description": "敵防御を大きく削って叩き込む防御貫通アクティブスキル",
+    "aliases": ["rekkodan", "れっこうだん", "裂甲断"],
+    "levels": [
+      {
+        "description": "攻x1.70 / 防御50%無視 / CT6",
+        "attack_multiplier": 1.7,
+        "duration_turns": 0,
+        "duration_ticks": 0,
+        "cooldown_actions": 6,
+        "special_effects": [
+          {
+            "kind": "defense_ignore",
+            "summary": "防御50%無視",
+            "params": {
+              "rate": 0.5
+            }
+          }
+        ],
+        "upgrade_costs": {
+          "skill_book": 3
+        }
+      }
+    ],
+    "infinite_growth": {
+      "description_template": "攻x{attack_multiplier:.2f} / 防御50%無視 / CT{cooldown_actions}",
+      "attack_multiplier_step": 0.05,
+      "cooldown_actions_step": -1,
+      "cooldown_actions_every": 10,
+      "upgrade_cost_steps": {
+        "skill_book": 1
+      }
+    }
+  },
+  "active_star_guide": {
+    "name": "星導",
+    "type": "active",
+    "slot": "active_7",
+    "target": "self",
+    "deals_damage": false,
+    "initial_unlocked": false,
+    "sort_order": 170,
+    "max_level": 20,
+    "description": "行動後のゲージ回復を継続付与する支援アクティブスキル",
+    "aliases": ["starguide", "せいどう", "星導"],
+    "levels": [
+      {
+        "description": "行動後ゲージ+70 x4T / CT9",
+        "duration_turns": 4,
+        "duration_ticks": 4,
+        "cooldown_actions": 9,
+        "action_gauge_bonus": 70,
+        "special_effects": [
+          {
+            "kind": "action_gauge_regen",
+            "summary": "継続ゲージ回復",
+            "timing": "turn_start",
+            "target": "self",
+            "params": {}
+          }
+        ],
+        "upgrade_costs": {
+          "skill_book": 3
+        }
+      }
+    ],
+    "infinite_growth": {
+      "description_template": "行動後ゲージ+{action_gauge_bonus} x{duration_turns}T / CT{cooldown_actions}",
+      "action_gauge_bonus_step": 2,
+      "action_gauge_bonus_every": 2,
+      "cooldown_actions_step": -1,
+      "cooldown_actions_every": 10,
+      "upgrade_cost_steps": {
+        "skill_book": 1
+      }
+    }
+  }
+}

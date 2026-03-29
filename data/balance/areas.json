@@ -1,0 +1,321 @@
+{
+  "朝の森": {
+    "aliases": ["朝", "森"],
+    "tier": 1,
+    "min_sec": 300,
+    "max_sec": 480,
+    "encounters": [4, 6],
+    "drop_rate_bonus": -0.18,
+    "gold_rate": 1.85,
+    "max_rarity": "epic",
+    "level_exp_scaling": {
+      "threshold_level": 20,
+      "below_or_equal_rate": 1.45,
+      "above_rate": 0.28
+    },
+    "first_clear_rewards": {
+      "unlock_slots": ["armor", "ring", "shoes"],
+      "summary": "防具・装飾・靴スロット解放"
+    },
+    "rare_bonus": {
+      "common": 12,
+      "rare": -8,
+      "epic": -3,
+      "legendary": -1
+    }
+  },
+  "三日月廃墟": {
+    "aliases": ["三日月", "廃墟"],
+    "tier": 2,
+    "min_sec": 420,
+    "max_sec": 660,
+    "encounters": [5, 7],
+    "drop_rate_bonus": -0.22,
+    "gold_rate": 0.45,
+    "specialty": "装備エンチャ素材",
+    "first_clear_rewards": {
+      "unlock_features": [
+        {
+          "key": "enchanting",
+          "label": "エンチャント解放",
+          "summary": "エンチャント解放"
+        }
+      ]
+    },
+    "max_rarity": "epic",
+    "rare_bonus": {
+      "common": -8,
+      "rare": 5,
+      "epic": 4,
+      "legendary": -10
+    },
+    "enchantment_drops": [
+      {
+        "slot": "weapon",
+        "chance": 1.0,
+        "min": 0,
+        "max": 0,
+        "elite_bonus": 0,
+        "boss_bonus": 1
+      }
+    ],
+    "battle_scaling": {
+      "late_game_start": 5,
+      "late_progress_interval": 1.0,
+      "late_hp_multiplier": 1.0,
+      "late_hp_multiplier_per_step": 0.0,
+      "late_hp_acceleration": 0.0,
+      "late_atk_entry_bonus": 0,
+      "late_atk_bonus_per_step": 0.0,
+      "late_atk_acceleration": 0.0,
+      "late_def_entry_bonus": 0,
+      "late_def_bonus_per_step": 0.0,
+      "late_def_acceleration": 0.0,
+      "late_exp_multiplier": 1.0,
+      "late_exp_multiplier_per_step": 0.0,
+      "late_exp_acceleration": 0.0,
+      "late_gold_multiplier": 1.0,
+      "late_gold_multiplier_per_step": 0.0,
+      "late_gold_acceleration": 0.0,
+      "late_drop_rate_bonus": 0.0,
+      "late_drop_rate_bonus_per_step": 0.0,
+      "late_drop_rate_bonus_acceleration": 0.0,
+      "late_resource_bonus": 0.0,
+      "late_resource_bonus_per_step": 0.55,
+      "late_resource_bonus_acceleration": 0.03
+    }
+  },
+  "ヘッセ深部": {
+    "aliases": ["ヘッセ", "深部"],
+    "tier": 3,
+    "min_sec": 600,
+    "max_sec": 900,
+    "encounters": [6, 8],
+    "drop_rate_bonus": -0.10,
+    "gold_rate": 0.18,
+    "first_clear_rewards": {
+      "unlock_features": [
+        {
+          "key": "rare_hunt",
+          "label": "高レア探索補正",
+          "summary": "高レア率アップ",
+          "rarity_bonus": {
+            "common": -12,
+            "rare": 7,
+            "epic": 5,
+            "legendary": 3
+          }
+        }
+      ],
+      "auto_explore_fragments": 1
+    },
+    "max_rarity": "epic",
+    "rare_bonus": {
+      "common": -28,
+      "rare": 6,
+      "epic": 9,
+      "legendary": 12
+    }
+  },
+  "紅蓮の鉱山": {
+    "aliases": ["紅蓮", "鉱山", "武器素材", "紅炎", "鍛冶坑", "紅炎の鍛冶坑"],
+    "tier": 4,
+    "min_sec": 720,
+    "max_sec": 1020,
+    "encounters": [6, 8],
+    "drop_rate_bonus": -0.24,
+    "gold_rate": 0.22,
+    "specialty": "武器強化素材",
+    "first_clear_rewards": {
+      "unlock_features": [
+        {
+          "key": "weapon_forge",
+          "label": "武器育成補助",
+          "summary": "武器強化 成功率+8% / Cost軽減",
+          "enhancement_bonus": {
+            "success_rate_bonus": 0.08,
+            "gold_cost_rate": 0.85,
+            "material_discount": 1
+          }
+        }
+      ],
+      "auto_explore_fragments": 1
+    },
+    "max_rarity": "epic",
+    "rare_bonus": {
+      "common": -18,
+      "rare": 6,
+      "epic": 8,
+      "legendary": -20
+    },
+    "material_drop": {
+      "slot": "weapon",
+      "chance": 1.0,
+      "min": 1,
+      "max": 2,
+      "elite_bonus": 1,
+      "boss_bonus": 2
+    },
+    "battle_scaling": {
+      "late_game_start": 11,
+      "late_progress_interval": 4,
+      "late_hp_multiplier": 2.35,
+      "late_hp_multiplier_per_step": 0.85,
+      "late_hp_acceleration": 0.24,
+      "late_atk_entry_bonus": 42,
+      "late_atk_bonus_per_step": 16,
+      "late_atk_acceleration": 5,
+      "late_def_entry_bonus": 14,
+      "late_def_bonus_per_step": 6,
+      "late_def_acceleration": 2,
+      "late_exp_multiplier": 1.45,
+      "late_gold_multiplier": 1.0,
+      "late_drop_rate_bonus": 0.0
+    }
+  },
+  "沈黙の城塞跡": {
+    "aliases": ["沈黙", "城塞", "防具素材"],
+    "tier": 4,
+    "min_sec": 720,
+    "max_sec": 1020,
+    "encounters": [6, 8],
+    "drop_rate_bonus": -0.24,
+    "gold_rate": 0.22,
+    "specialty": "防具強化素材",
+    "first_clear_rewards": {
+      "unlock_features": [
+        {
+          "key": "survival_guard",
+          "label": "生存補助",
+          "summary": "防具装備で致死耐性+1",
+          "guard_bonus": {
+            "base_count": 1
+          }
+        }
+      ],
+      "auto_explore_fragments": 1
+    },
+    "max_rarity": "epic",
+    "rare_bonus": {
+      "common": -18,
+      "rare": 6,
+      "epic": 8,
+      "legendary": -20
+    },
+    "material_drop": {
+      "slot": "armor",
+      "chance": 1.0,
+      "min": 1,
+      "max": 2,
+      "elite_bonus": 1,
+      "boss_bonus": 2
+    },
+    "battle_scaling": {
+      "late_game_start": 11,
+      "late_progress_interval": 4,
+      "late_hp_multiplier": 2.35,
+      "late_hp_multiplier_per_step": 0.85,
+      "late_hp_acceleration": 0.24,
+      "late_atk_entry_bonus": 42,
+      "late_atk_bonus_per_step": 16,
+      "late_atk_acceleration": 5,
+      "late_def_entry_bonus": 14,
+      "late_def_bonus_per_step": 6,
+      "late_def_acceleration": 2,
+      "late_exp_multiplier": 1.45,
+      "late_gold_multiplier": 1.0,
+      "late_drop_rate_bonus": 0.0
+    }
+  },
+  "星影の祭壇": {
+    "aliases": ["星影", "祭壇", "装飾素材"],
+    "tier": 5,
+    "min_sec": 780,
+    "max_sec": 1080,
+    "encounters": [7, 9],
+    "drop_rate_bonus": -0.20,
+    "gold_rate": 0.18,
+    "specialty": "装飾強化素材",
+    "first_clear_rewards": {
+      "unlock_features": [
+        {
+          "key": "auto_repeat_route",
+          "label": "自動周回導線",
+          "summary": "自動周回導線解放"
+        }
+      ]
+    },
+    "max_rarity": "epic",
+    "rare_bonus": {
+      "common": -20,
+      "rare": 7,
+      "epic": 9,
+      "legendary": -20
+    },
+    "material_drop": {
+      "slot": "ring",
+      "chance": 1.0,
+      "min": 1,
+      "max": 2,
+      "elite_bonus": 1,
+      "boss_bonus": 2
+    },
+    "battle_scaling": {
+      "late_game_start": 11,
+      "late_progress_interval": 4,
+      "late_hp_multiplier": 2.35,
+      "late_hp_multiplier_per_step": 0.85,
+      "late_hp_acceleration": 0.24,
+      "late_atk_entry_bonus": 42,
+      "late_atk_bonus_per_step": 16,
+      "late_atk_acceleration": 5,
+      "late_def_entry_bonus": 14,
+      "late_def_bonus_per_step": 6,
+      "late_def_acceleration": 2,
+      "late_exp_multiplier": 1.45,
+      "late_gold_multiplier": 1.0,
+      "late_drop_rate_bonus": 0.0
+    }
+  },
+  "迅雷の断崖": {
+    "aliases": ["迅雷", "断崖", "靴素材", "迅崖"],
+    "tier": 6,
+    "min_sec": 840,
+    "max_sec": 1200,
+    "encounters": [7, 9],
+    "drop_rate_bonus": -0.26,
+    "gold_rate": 0.16,
+    "specialty": "靴強化素材",
+    "max_rarity": "epic",
+    "rare_bonus": {
+      "common": -22,
+      "rare": 8,
+      "epic": 10,
+      "legendary": -20
+    },
+    "material_drop": {
+      "slot": "shoes",
+      "chance": 1.0,
+      "min": 1,
+      "max": 2,
+      "elite_bonus": 1,
+      "boss_bonus": 2
+    },
+    "battle_scaling": {
+      "late_game_start": 12,
+      "late_progress_interval": 4,
+      "late_hp_multiplier": 2.6,
+      "late_hp_multiplier_per_step": 0.95,
+      "late_hp_acceleration": 0.28,
+      "late_atk_entry_bonus": 48,
+      "late_atk_bonus_per_step": 18,
+      "late_atk_acceleration": 6,
+      "late_def_entry_bonus": 16,
+      "late_def_bonus_per_step": 7,
+      "late_def_acceleration": 2,
+      "late_exp_multiplier": 1.5,
+      "late_gold_multiplier": 1.0,
+      "late_drop_rate_bonus": 0.0
+    }
+  }
+}

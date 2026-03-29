@@ -1,0 +1,131 @@
+{
+  "rarity_order": {
+    "common": 0,
+    "rare": 1,
+    "epic": 2,
+    "legendary": 3
+  },
+  "rarity_label": {
+    "common": "コモン",
+    "rare": "レア",
+    "epic": "エピック",
+    "legendary": "レジェンダリー"
+  },
+  "rarity_prefix": {
+    "common": "古びた",
+    "rare": "良質な",
+    "epic": "呪黒の",
+    "legendary": "深淵の"
+  },
+  "rarity_power_bonus": {
+    "common": 0,
+    "rare": 3,
+    "epic": 7,
+    "legendary": 12
+  },
+  "base_rarity_weights": {
+    "common": 68,
+    "rare": 24,
+    "epic": 7,
+    "legendary": 1
+  },
+  "slot_label": {
+    "weapon": "武器",
+    "armor": "防具",
+    "ring": "装飾",
+    "shoes": "靴"
+  },
+  "item_base_names": {
+    "weapon": ["武器"],
+    "armor": ["防具"],
+    "ring": ["装飾"],
+    "shoes": ["靴"]
+  },
+  "legendary_unique_names": {
+    "weapon": "転生者の武器",
+    "armor": "転生者の防具",
+    "ring": "転生者の装飾",
+    "shoes": "転生者の靴"
+  },
+  "material_labels": {
+    "weapon": "武器黒石",
+    "armor": "防具黒石",
+    "ring": "装飾黒石",
+    "shoes": "靴黒石"
+  },
+  "slot_drop_weights": {
+    "weapon": 1,
+    "armor": 1,
+    "ring": 1,
+    "shoes": 1
+  },
+  "slot_stat_weights": {
+    "weapon": {
+      "atk": 1.0
+    },
+    "armor": {
+      "def": 1.0
+    },
+    "ring": {
+      "atk": 1.0,
+      "def": 1.0
+    },
+    "shoes": {
+      "speed": 1.0
+    }
+  },
+  "enhancement": {
+    "max_level": 20,
+    "success_rates": [1.0, 0.95, 0.88, 0.8, 0.72, 0.62, 0.52, 0.42, 0.32, 0.24, 0.18, 0.14, 0.11, 0.085, 0.065, 0.05, 0.038, 0.028, 0.02, 0.014],
+    "power_gain": {
+      "weapon": 2,
+      "armor": 2,
+      "ring": 1,
+      "shoes": 1
+    },
+    "material_cost_base": 1,
+    "material_cost_step": 1,
+    "material_cost_interval": 3,
+    "endgame_start_level": 10,
+    "material_cost_endgame_step": 2,
+    "deep_endgame_start_level": 15,
+    "material_cost_deep_endgame_step": 3,
+    "gold_cost_base": 15,
+    "gold_cost_step": 12,
+    "gold_cost_endgame_step": 50,
+    "gold_cost_deep_endgame_step": 90,
+    "rarity_gold_bonus": {
+      "common": 0,
+      "rare": 8,
+      "epic": 16,
+      "legendary": 30
+    }
+  },
+  "enchantment": {
+    "material_labels": {
+      "weapon": "三日月呪石",
+      "armor": "三日月呪石",
+      "ring": "三日月呪石"
+    },
+    "effect_labels": {
+      "weapon": "会心",
+      "armor": "致死回避",
+      "ring": "探索精度"
+    },
+    "armor_guard_count": 1,
+    "weapon_crit_rate": 0.08,
+    "weapon_crit_rate_per_enhance": 0.01,
+    "weapon_crit_damage_multiplier": 1.5,
+    "ring_exp_rate": 1.12,
+    "ring_exp_rate_per_enhance": 0.01,
+    "ring_gold_rate": 1.08,
+    "ring_gold_rate_per_enhance": 0.008,
+    "ring_drop_rate_bonus": 0.08,
+    "ring_drop_rate_bonus_per_enhance": 0.008
+  },
+  "power_per_tier": 3,
+  "power_roll_min": 1,
+  "power_roll_max": 3,
+  "value_per_rarity_rank": 4,
+  "minimum_item_value": 4
+}
