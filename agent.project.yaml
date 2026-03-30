@@ -1,0 +1,46 @@
+name: PythonChatBot
+root: .
+language: python
+
+entrypoints:
+  - bot.py
+  - dev.py
+
+important_files:
+  - README.md
+  - app_config.py
+  - bot.py
+  - bot_components/rpg_commands.py
+  - bot_components/chat_listener.py
+  - rpg_core/manager.py
+  - rpg_core/detail_overlay.py
+  - rpg_core/world_boss_service.py
+
+test_commands:
+  - python dev.py test
+
+run_commands:
+  - python dev.py run
+
+allowed_tools:
+  - list_files
+  - read_file
+  - search_text
+  - git_status
+  - run_command
+
+allowed_commands:
+  - python dev.py doctor
+  - python dev.py test
+  - python dev.py run
+
+blocked_paths:
+  - .env
+  - venv/
+  - data/runtime/
+  - layerdivider/
+
+prompt_notes:
+  - 既存コマンド名と後方互換入力を壊さない
+  - 変更前に既存テストの意図を確認する
+  - 外部AIの回答は参考情報として扱い、最終判断は人間または Codex が行う

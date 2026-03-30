@@ -2228,9 +2228,27 @@ class BasicCommands(commands.Component):
             name = str(entry.get("display_name", "?") or "?").strip() or "?"
             title_label = str(entry.get("title_label", "") or "").strip()
             name = self._format_titled_display_name(name, title_label)
-            damage = max(0, int(entry.get("total_damage", 0)))
-            parts.append(f"#{rank} {name} {damage}")
+            contribution_score = max(
+                0,
+                int(entry.get("total_contribution_score", entry.get("contribution_score", 0)) or 0),
+            )
+            parts.append(f"#{rank} {name} 貢献{contribution_score}")
         return " / ".join(parts)
+
+    def _format_world_boss_contribution_breakdown(self, payload: Dict[str, Any]) -> str:
+        contribution = payload.get("contribution", {})
+        if not isinstance(contribution, dict):
+            contribution = {}
+        damage_score = max(0, int(contribution.get("damage_score", 0) or 0))
+        support_score = max(0, int(contribution.get("support_score", 0) or 0))
+        survival_score = max(0, int(contribution.get("survival_score", 0) or 0))
+        objective_score = max(0, int(contribution.get("objective_score", 0) or 0))
+        return (
+            f"攻 {damage_score} / "
+            f"支 {support_score} / "
+            f"生 {survival_score} / "
+            f"目 {objective_score}"
+        )
 
     def _get_world_boss_summon_material_cost(self) -> int:
         getter = getattr(self.bot.rpg, "get_world_boss_summon_material_cost", None)
@@ -2246,6 +2264,14 @@ class BasicCommands(commands.Component):
         boss = status.get("boss", {})
         boss_name = str(boss.get("name", "WB") or "WB").strip() or "WB"
         boss_title = str(boss.get("title", "") or "").strip()
+        phase_label = str(status.get("phase_label", "") or "").strip()
+        event_text = str(status.get("event_text", "") or "").strip()
+        leader_name = str(status.get("leader_name", "") or "").strip()
+        leader_score = max(0, int(status.get("leader_score", 0) or 0))
+        runner_up_name = str(status.get("runner_up_name", "") or "").strip()
+        runner_up_score = max(0, int(status.get("runner_up_score", 0) or 0))
+        leader_gap = max(0, int(status.get("leader_gap", 0) or 0))
+        race_focus_active = bool(status.get("race_focus_active", False))
         ranking = [
             entry
             for entry in status.get("ranking", [])
@@ -2303,6 +2329,15 @@ class BasicCommands(commands.Component):
             lines.append(self._overlay_kv("状態", f"戦闘中 / 残り {self.bot.rpg.format_duration(remain)}"))
             lines.append(self._overlay_kv("HP", f"{current_hp}/{max_hp} ({hp_pct}%)"))
 
+        if phase_label:
+            lines.append(self._overlay_kv("フェーズ", phase_label))
+        if event_text:
+            lines.append(self._overlay_kv("イベント", event_text))
+        if leader_name and race_focus_active:
+            race_text = f"#1 {leader_name} {leader_score}"
+            if runner_up_name:
+                race_text += f" / #2 {runner_up_name} {runner_up_score} / 差 {leader_gap}"
+            lines.append(self._overlay_kv("総合貢献王争い", race_text))
         if ranking:
             lines.append(self._overlay_kv("順位", self._build_world_boss_ranking_summary(ranking)))
 
@@ -2320,7 +2355,7 @@ class BasicCommands(commands.Component):
                         f"{self_rank_text} / {self_alive} / "
                         f"HP {self_hp}/{self_max_hp} / "
                         f"{int(self_status.get('total_damage', 0))}ダメ / "
-                        f"貢献 {int(self_status.get('contribution_score', 0))}"
+                        f"貢献 {int(self_status.get('total_contribution_score', self_status.get('contribution_score', 0)))}"
                     ),
                 )
             )
@@ -2475,10 +2510,11 @@ class BasicCommands(commands.Component):
                 (
                     f"順位 #{max(1, int(result.get('rank', 1)))} / "
                     f"{max(0, int(result.get('total_damage', 0)))}ダメ / "
-                    f"貢献 {max(0, int(result.get('contribution_score', 0)))} / "
+                    f"貢献 {max(0, int(result.get('total_contribution_score', result.get('contribution_score', 0))))} / "
                     f"離脱 {max(0, int(result.get('times_downed', 0)))}回"
                 ),
             ),
+            self._overlay_kv("貢献内訳", self._format_world_boss_contribution_breakdown(result)),
             self._overlay_kv("報酬", " / ".join(reward_parts)),
         ]
         new_achievements = [
@@ -2555,7 +2591,7 @@ class BasicCommands(commands.Component):
                     (
                         f"{entry_name} / "
                         f"{max(0, int(entry.get('total_damage', 0)))}ダメ / "
-                        f"貢献 {max(0, int(entry.get('contribution_score', 0)))}"
+                        f"貢献 {max(0, int(entry.get('total_contribution_score', entry.get('contribution_score', 0))))}"
                     ),
                 )
             )

@@ -249,7 +249,7 @@ class WorldBossServiceTests(unittest.TestCase):
             with patch.object(manager.world_boss.battle_service, "get_base_damage", return_value=99):
                 message = manager.world_boss._run_threshold_aoe(state, threshold=75, now=106.0)
 
-            self.assertEqual(message, "WB HP75%突破 / 怒りの全体攻撃")
+            self.assertEqual(message, "WB HP75%突破 / PHASE 2")
             self.assertEqual(
                 state["recent_logs"][-1],
                 "WB全体攻撃: 4人へ / 戦闘不能4人 / Alice / Bob / Carol / ...ほか1人",
@@ -294,8 +294,85 @@ class WorldBossServiceTests(unittest.TestCase):
             self.assertGreater(result["rewards"]["exp"], 0)
             self.assertGreater(result["rewards"]["gold"], 0)
             self.assertGreater(result["rewards"]["material_amount"], 0)
+            self.assertGreater(result["contribution"]["objective_score"], 0)
             self.assertGreater(alice["world_boss_materials"]["test_shell"], 0)
             self.assertEqual(len(alice["world_boss_history"]), 1)
+
+    def test_world_boss_status_hides_late_join_visual_event_and_delays_race_focus(self) -> None:
+        with patch("rpg_core.world_boss_service.WORLD_BOSSES", TEST_WORLD_BOSSES):
+            manager = RPGManager({"users": {"alice": {}, "bob": {}}})
+            manager.users.get_player_stats = lambda _u, _mode_key: {
+                "atk": 10,
+                "def": 3,
+                "speed": 100,
+                "max_hp": 120,
+            }
+            manager.users.get_weapon_crit_stats = lambda _u: (0.0, 1.0)
+
+            ok, _ = manager.world_boss.start_boss("test_boss", now=100.0)
+            self.assertTrue(ok)
+            ok, _ = manager.world_boss.join_boss("alice", now=101.0)
+            self.assertTrue(ok)
+            ok, _ = manager.world_boss.skip_recruiting(now=102.0)
+            self.assertTrue(ok)
+            ok, _ = manager.world_boss.join_boss("bob", now=103.0)
+            self.assertTrue(ok)
+
+            status = manager.world_boss.get_status("bob")
+            self.assertEqual(status["phase"], "active")
+            self.assertEqual(status["event_kind"], "")
+            self.assertEqual(status["event_text"], "")
+            self.assertFalse(status["race_focus_active"])
+            self.assertTrue(
+                any(str(line).startswith("途中参加:") for line in status["recent_logs"])
+            )
+
+            state = manager.world_boss.get_state()
+            state["current_hp"] = 2
+            manager.world_boss._refresh_visual_state(state)
+
+            last_stand_status = manager.world_boss.get_status("bob")
+            self.assertEqual(last_stand_status["phase_id"], "last_stand")
+            self.assertTrue(last_stand_status["race_focus_active"])
+
+    def test_world_boss_support_skill_adds_support_score_breakdown(self) -> None:
+        with patch("rpg_core.world_boss_service.WORLD_BOSSES", TEST_WORLD_BOSSES):
+            manager = RPGManager({"users": {"alice": {}}})
+            manager.users.get_player_stats = lambda _u, _mode_key: {
+                "atk": 10,
+                "def": 3,
+                "speed": 100,
+                "max_hp": 120,
+            }
+            manager.users.get_weapon_crit_stats = lambda _u: (0.0, 1.0)
+            manager.users.get_selected_active_skills = lambda _u: [
+                {
+                    "skill_id": "active_crimson_focus",
+                    "name": "紅蓮集中",
+                    "target": "self",
+                    "deals_damage": False,
+                    "atk_bonus": 8,
+                    "duration_turns": 2,
+                    "duration_ticks": 2,
+                    "cooldown_actions": 5,
+                }
+            ]
+
+            ok, _ = manager.world_boss.start_boss("test_boss", now=100.0)
+            self.assertTrue(ok)
+            ok, _ = manager.world_boss.join_boss("alice", now=101.0)
+            self.assertTrue(ok)
+            ok, _ = manager.world_boss.skip_recruiting(now=102.0)
+            self.assertTrue(ok)
+
+            state = manager.world_boss.get_state()
+            manager.world_boss._run_player_phase(state)
+
+            participant = state["participants"]["alice"]
+            self.assertEqual(participant["total_damage"], 0)
+            self.assertGreater(participant["contribution"]["support_score"], 0)
+            self.assertGreater(participant["contribution"]["survival_score"], 0)
+            self.assertTrue(participant["active_effects"])
 
     def test_finalize_exploration_area_boss_clear_can_auto_start_world_boss(self) -> None:
         with patch("rpg_core.world_boss_service.WORLD_BOSSES", TEST_WORLD_BOSSES), patch(
@@ -641,10 +718,14 @@ class WorldBossCommandTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(status["self"]["alive"])
             self.assertIn("途中参加しました", bob_ctx.replies[-1])
             self.assertIn("途中参加: Bob", status["recent_logs"])
+            self.assertEqual(status["event_text"], "")
+            self.assertFalse(status["race_focus_active"])
             self.assertTrue(bot.overlays)
             overlay_title, overlay_lines = bot.overlays[-1]
             self.assertEqual(overlay_title, "Bob / !wb")
             self.assertIn("kv: 参加人数 | 2人", overlay_lines)
+            self.assertNotIn("kv: イベント | 途中参加: Bob", overlay_lines)
+            self.assertFalse(any("総合貢献王争い" in line for line in overlay_lines))
 
     async def test_advice_recommends_world_boss_join_only_once_during_recruiting(self) -> None:
         with patch("rpg_core.world_boss_service.WORLD_BOSSES", TEST_WORLD_BOSSES):
@@ -711,6 +792,7 @@ class WorldBossCommandTests(unittest.IsolatedAsyncioTestCase):
             text = "\n".join(lines)
             self.assertIn("試練の甲帝", text)
             self.assertIn("順位 #1", text)
+            self.assertIn("貢献内訳", text)
             self.assertIn("試練殻片", text)
             self.assertTrue(alice_ctx.replies)
             self.assertIn("試練の甲帝", alice_ctx.replies[-1])
@@ -775,7 +857,7 @@ class WorldBossCommandTests(unittest.IsolatedAsyncioTestCase):
                     (),
                     {
                         "process_world_boss": lambda *_args, **_kwargs: (
-                            ["WB残り30秒", "MVP Alice / 120ダメ"],
+                            ["WB残り30秒", "総合貢献王 Alice / 貢献 120 / 120ダメ"],
                             True,
                         ),
                         "get_world_boss_status": lambda *_args, **_kwargs: {
@@ -810,12 +892,12 @@ class WorldBossCommandTests(unittest.IsolatedAsyncioTestCase):
             bot.tts_messages,
             [
                 "残り30秒。手ぇ止めてる間抜けは戦犯だ",
-                "MVPは Alice。他の雑魚は背中だけ見てろ",
+                "総合貢献王は Alice。他の雑魚は背中だけ見てろ",
             ],
         )
         self.assertEqual(
             bot.sent_messages,
-            [("WB残り30秒", None), ("MVP Alice / 120ダメ", None)],
+            [("WB残り30秒", None), ("総合貢献王 Alice / 貢献 120 / 120ダメ", None)],
         )
         self.assertEqual(bot.visual_refreshes, 1)
 
@@ -896,6 +978,63 @@ class WorldBossCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("kv: 状態 | クールダウン / 残り 45秒", text)
         self.assertNotIn("kv: WB |", text)
         self.assertEqual(bot._world_boss_visual_last_phase, "cooldown")
+
+    def test_refresh_world_boss_visual_html_passes_race_focus_meta(self) -> None:
+        overlay = _VisualOverlayRecorder()
+        bot = type("Bot", (), {})()
+        bot._detail_overlay = overlay
+        bot._world_boss_visual_last_refresh_ts = 0.0
+        bot._world_boss_visual_last_phase = "active"
+        bot._world_boss_visual_refresh_sec = 2.0
+        bot.log = type("Log", (), {"exception": lambda *_args, **_kwargs: None})()
+        bot._build_world_boss_ranking_summary = lambda ranking: StreamBot._build_world_boss_ranking_summary(
+            bot, ranking
+        )
+        bot._build_world_boss_visual_overlay = lambda: StreamBot._build_world_boss_visual_overlay(bot)
+        bot.rpg = type(
+            "Rpg",
+            (),
+            {
+                "get_world_boss_status": lambda *_args, **_kwargs: {
+                    "phase": "active",
+                    "phase_id": "last_stand",
+                    "phase_label": "LAST STAND",
+                    "event_kind": "ranking",
+                    "event_text": "総合貢献王争い / #1 Alice 120 / #2 Bob 112 / 差 8",
+                    "boss_id": "crimson_beetle_emperor",
+                    "boss": {"name": "灼甲帝ヴァルカラン", "title": "紅蓮を喰らう甲殻王"},
+                    "participants": 3,
+                    "current_hp": 480,
+                    "max_hp": 1500,
+                    "ends_at": 122.0,
+                    "recent_logs": ["WB残り30秒"],
+                    "ranking": [
+                        {"rank": 1, "display_name": "Alice", "total_contribution_score": 120},
+                        {"rank": 2, "display_name": "Bob", "total_contribution_score": 112},
+                    ],
+                    "leader_name": "Alice",
+                    "leader_score": 120,
+                    "runner_up_name": "Bob",
+                    "runner_up_score": 112,
+                    "leader_gap": 8,
+                    "race_focus_active": True,
+                },
+                "format_duration": lambda *_args, **_kwargs: "22秒",
+            },
+        )()
+
+        with patch("bot.now_ts", return_value=100.0):
+            StreamBot.refresh_world_boss_visual_html(bot)
+
+        self.assertEqual(len(overlay.calls), 1)
+        _title, lines = overlay.calls[0]
+        text = "\n".join(lines)
+        self.assertIn("meta: wb_phase | active", text)
+        self.assertIn("meta: wb_phase_id | last_stand", text)
+        self.assertIn("meta: wb_boss_id | crimson_beetle_emperor", text)
+        self.assertIn("meta: wb_event_kind | ranking", text)
+        self.assertIn("meta: wb_race_focus_active | 1", text)
+        self.assertIn("meta: wb_race_text | #1 Alice 120 / #2 Bob 112 / 差 8", text)
 
 
 if __name__ == "__main__":

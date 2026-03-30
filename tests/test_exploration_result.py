@@ -543,7 +543,7 @@ class ExplorationResultTests(unittest.TestCase):
 
         self.assertEqual(
             queued_messages,
-            ["MVPは Alice。他の雑魚は背中だけ見てろ"],
+            ["総合貢献王は Alice。他の雑魚は背中だけ見てろ"],
         )
 
     def test_build_world_boss_log_tts_message_reads_downed_log(self) -> None:

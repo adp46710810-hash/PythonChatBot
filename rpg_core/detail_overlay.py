@@ -26,6 +26,8 @@ class OverlayEntry:
 class WorldBossOverlayState:
     boss_name: str = "WORLD BOSS"
     boss_title: str = ""
+    phase: str = ""
+    phase_id: str = ""
     status_text: str = ""
     result_text: str = ""
     hp_text: str = ""
@@ -38,6 +40,12 @@ class WorldBossOverlayState:
     stage_classes: List[str] = field(default_factory=list)
     show_stage: bool = True
     visual_url: str = ""
+    boss_id: str = ""
+    phase_label: str = ""
+    event_text: str = ""
+    event_kind: str = ""
+    race_focus_active: bool = False
+    race_text: str = ""
 
 
 @dataclass
@@ -178,6 +186,10 @@ class DetailOverlayWriter:
   <meta http-equiv="Expires" content="0">
   <title>{safe_title}</title>
   <style>
+    * {{
+      box-sizing: border-box;
+    }}
+
     html, body {{
       margin: 0;
       width: 100%;
@@ -195,6 +207,10 @@ class DetailOverlayWriter:
       font-family: "BIZ UDPGothic", "Yu Gothic UI", "Hiragino Sans", sans-serif;
     }}
 
+    .is-hidden {{
+      display: none !important;
+    }}
+
     .wb-stage-shell {{
       width: 100%;
       min-height: 100vh;
@@ -207,22 +223,280 @@ class DetailOverlayWriter:
 
     .wb-stage {{
       position: relative;
-      width: min(100%, 560px);
+      width: min(100%, 620px);
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: visible;
       isolation: isolate;
+      --wb-theme-top: rgba(255, 210, 140, 0.54);
+      --wb-theme-left: rgba(255, 82, 82, 0.24);
+      --wb-theme-right: rgba(32, 104, 255, 0.22);
+      --wb-aura-core: rgba(255, 225, 167, 0.88);
+      --wb-aura-edge: rgba(255, 139, 79, 0.18);
+      --wb-impact-core: rgba(255, 242, 198, 0.42);
+      --wb-impact-mid: rgba(255, 189, 111, 0.24);
+      --wb-impact-edge: rgba(255, 122, 85, 0.12);
+      --wb-bar-a: #f9735c;
+      --wb-bar-b: #ffb357;
+      --wb-bar-c: #ffe27f;
+      --wb-phase-bg: rgba(15, 13, 24, 0.72);
+      --wb-phase-border: rgba(255, 231, 197, 0.22);
+      --wb-phase-text: rgba(255, 247, 234, 0.98);
+      --wb-event-bg: rgba(14, 12, 22, 0.72);
+      --wb-event-border: rgba(255, 231, 197, 0.22);
+      --wb-event-text: rgba(255, 245, 233, 0.98);
+      --wb-panel-glow: rgba(255, 182, 105, 0.24);
     }}
 
     .wb-stage.is-hidden {{
-      display: none;
+      display: none !important;
+    }}
+
+    .wb-stage.wb-theme--crimson {{
+      --wb-theme-top: rgba(255, 173, 120, 0.58);
+      --wb-theme-left: rgba(255, 88, 72, 0.30);
+      --wb-theme-right: rgba(255, 216, 102, 0.20);
+      --wb-aura-core: rgba(255, 214, 150, 0.92);
+      --wb-aura-edge: rgba(255, 103, 72, 0.26);
+      --wb-impact-core: rgba(255, 244, 194, 0.48);
+      --wb-impact-mid: rgba(255, 164, 78, 0.28);
+      --wb-impact-edge: rgba(255, 92, 74, 0.16);
+      --wb-bar-a: #ff6f4e;
+      --wb-bar-b: #ffb03f;
+      --wb-bar-c: #ffe182;
+      --wb-panel-glow: rgba(255, 131, 74, 0.28);
+    }}
+
+    .wb-stage.wb-theme--moon {{
+      --wb-theme-top: rgba(182, 225, 255, 0.54);
+      --wb-theme-left: rgba(94, 168, 255, 0.22);
+      --wb-theme-right: rgba(183, 209, 255, 0.30);
+      --wb-aura-core: rgba(214, 240, 255, 0.90);
+      --wb-aura-edge: rgba(118, 171, 255, 0.20);
+      --wb-impact-core: rgba(225, 247, 255, 0.42);
+      --wb-impact-mid: rgba(120, 182, 255, 0.24);
+      --wb-impact-edge: rgba(166, 212, 255, 0.16);
+      --wb-bar-a: #66a4ff;
+      --wb-bar-b: #7fd8ff;
+      --wb-bar-c: #d5f3ff;
+      --wb-panel-glow: rgba(116, 182, 255, 0.26);
+    }}
+
+    .wb-stage.wb-theme--witch {{
+      --wb-theme-top: rgba(255, 196, 148, 0.52);
+      --wb-theme-left: rgba(198, 88, 68, 0.24);
+      --wb-theme-right: rgba(255, 235, 167, 0.22);
+      --wb-aura-core: rgba(255, 226, 187, 0.90);
+      --wb-aura-edge: rgba(197, 78, 56, 0.22);
+      --wb-impact-core: rgba(255, 240, 196, 0.42);
+      --wb-impact-mid: rgba(255, 143, 94, 0.26);
+      --wb-impact-edge: rgba(98, 12, 10, 0.18);
+      --wb-bar-a: #f06b55;
+      --wb-bar-b: #ffb26e;
+      --wb-bar-c: #ffe2aa;
+      --wb-panel-glow: rgba(244, 122, 84, 0.26);
+    }}
+
+    .wb-stage.wb-theme--fencer {{
+      --wb-theme-top: rgba(255, 236, 178, 0.52);
+      --wb-theme-left: rgba(216, 190, 128, 0.22);
+      --wb-theme-right: rgba(245, 252, 255, 0.26);
+      --wb-aura-core: rgba(255, 244, 211, 0.90);
+      --wb-aura-edge: rgba(214, 191, 126, 0.20);
+      --wb-impact-core: rgba(255, 251, 219, 0.44);
+      --wb-impact-mid: rgba(255, 221, 136, 0.24);
+      --wb-impact-edge: rgba(198, 176, 118, 0.14);
+      --wb-bar-a: #e1bb66;
+      --wb-bar-b: #f7d991;
+      --wb-bar-c: #fff1c8;
+      --wb-panel-glow: rgba(236, 210, 129, 0.26);
+    }}
+
+    .wb-stage__backdrop {{
+      position: absolute;
+      inset: 10% 6% 12%;
+      border-radius: 42px;
+      background:
+        radial-gradient(circle at 50% 18%, var(--wb-theme-top), transparent 38%),
+        radial-gradient(circle at 28% 66%, var(--wb-theme-left), transparent 42%),
+        radial-gradient(circle at 74% 72%, var(--wb-theme-right), transparent 44%);
+      filter: blur(34px);
+      opacity: 0.84;
+      transform: translate3d(0, 0, 0) scale(0.98);
+      transform-origin: 50% 55%;
+      animation: wb-backdrop-pulse 8.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+      pointer-events: none;
+      z-index: 0;
+    }}
+
+    .wb-stage__panel {{
+      position: relative;
+      z-index: 1;
+      width: min(100%, 560px);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: clamp(18px, 2.2vh, 28px);
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(21, 20, 29, 0.12), rgba(12, 11, 18, 0.42)),
+        linear-gradient(180deg, rgba(255, 248, 238, 0.18), rgba(255, 244, 233, 0.04));
+      border: 1px solid rgba(255, 231, 197, 0.16);
+      box-shadow:
+        0 30px 80px rgba(12, 10, 24, 0.24),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(8px);
+    }}
+
+    .wb-stage__signal {{
+      position: relative;
+      z-index: 2;
+      display: grid;
+      gap: 10px;
+      align-self: stretch;
+      margin-top: clamp(16px, 2.2vh, 26px);
+      pointer-events: none;
+    }}
+
+    .wb-stage__phase-row {{
+      display: flex;
+      justify-content: flex-start;
+    }}
+
+    .wb-stage__phase {{
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      background: var(--wb-phase-bg);
+      border: 1px solid var(--wb-phase-border);
+      color: var(--wb-phase-text);
+      font-size: clamp(11px, 0.95vw, 13px);
+      line-height: 1.3;
+      font-weight: 900;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      box-shadow:
+        0 14px 32px rgba(8, 7, 14, 0.24),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }}
+
+    .wb-stage__event {{
+      width: fit-content;
+      max-width: min(100%, 420px);
+      padding: 10px 14px;
+      border-radius: 18px;
+      background: var(--wb-event-bg);
+      border: 1px solid var(--wb-event-border);
+      color: var(--wb-event-text);
+      font-size: clamp(12px, 1.02vw, 14px);
+      line-height: 1.45;
+      font-weight: 800;
+      box-shadow:
+        0 16px 34px rgba(10, 8, 18, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+    }}
+
+    .wb-stage__event--critical {{
+      background: linear-gradient(180deg, rgba(118, 38, 10, 0.88), rgba(74, 18, 8, 0.92));
+      border-color: rgba(255, 214, 136, 0.34);
+    }}
+
+    .wb-stage__event--aoe,
+    .wb-stage__event--down,
+    .wb-stage__event--enrage {{
+      background: linear-gradient(180deg, rgba(120, 20, 18, 0.90), rgba(72, 12, 12, 0.94));
+      border-color: rgba(255, 178, 146, 0.34);
+    }}
+
+    .wb-stage__event--recover {{
+      background: linear-gradient(180deg, rgba(20, 94, 64, 0.84), rgba(12, 54, 42, 0.90));
+      border-color: rgba(172, 244, 212, 0.28);
+    }}
+
+    .wb-stage__event--start,
+    .wb-stage__event--recruiting {{
+      background: linear-gradient(180deg, rgba(20, 68, 112, 0.84), rgba(14, 34, 62, 0.90));
+      border-color: rgba(180, 224, 255, 0.28);
+    }}
+
+    .wb-stage__event--victory {{
+      background: linear-gradient(180deg, rgba(120, 88, 16, 0.88), rgba(76, 50, 10, 0.92));
+      border-color: rgba(255, 222, 146, 0.34);
+    }}
+
+    .wb-stage__event--timeout {{
+      background: linear-gradient(180deg, rgba(56, 58, 70, 0.90), rgba(28, 30, 40, 0.94));
+      border-color: rgba(196, 205, 223, 0.24);
+    }}
+
+    .wb-stage__event--ranking {{
+      background: linear-gradient(180deg, rgba(90, 68, 22, 0.90), rgba(52, 38, 12, 0.94));
+      border-color: rgba(255, 218, 132, 0.30);
+    }}
+
+    .wb-stage__figure-wrap {{
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      overflow: hidden;
+      pointer-events: none;
+    }}
+
+    .wb-stage__aura {{
+      position: absolute;
+      inset: 12% 10% 24%;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 50%, var(--wb-aura-core), var(--wb-aura-edge) 42%, transparent 72%);
+      filter: blur(20px);
+      opacity: 0.82;
+      transform: translate3d(0, 0, 0) scale(0.98);
+      animation: wb-aura-breathe 6.6s cubic-bezier(0.42, 0.08, 0.58, 0.94) infinite;
+      will-change: transform, opacity;
+    }}
+
+    .wb-stage__impact {{
+      position: absolute;
+      left: 50%;
+      bottom: 28%;
+      width: min(76%, 320px);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle, var(--wb-impact-core) 0%, var(--wb-impact-mid) 24%, var(--wb-impact-edge) 42%, transparent 68%);
+      filter: blur(8px);
+      opacity: 0;
+      transform: translate3d(-50%, 0, 0) scale(0.68);
+      will-change: transform, opacity;
+      mix-blend-mode: screen;
+    }}
+
+    .wb-stage__shadow {{
+      position: absolute;
+      left: 50%;
+      bottom: clamp(20px, 3vh, 34px);
+      width: min(72%, 280px);
+      height: clamp(18px, 3vh, 28px);
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(8, 8, 16, 0.42) 0%, rgba(8, 8, 16, 0.18) 54%, transparent 78%);
+      filter: blur(10px);
+      opacity: 0.34;
+      transform: translate3d(-50%, 0, 0) scaleX(1);
+      animation: wb-shadow-drift 6.8s cubic-bezier(0.42, 0.08, 0.58, 0.94) infinite;
+      will-change: transform, opacity;
     }}
 
     .wb-stage__figure {{
       position: relative;
-      width: min(100%, 560px);
+      width: min(100%, 520px);
       height: min(94vh, 1040px);
       display: flex;
       align-items: flex-end;
@@ -270,7 +544,7 @@ class DetailOverlayWriter:
     }}
 
     .wb-stage__fallback {{
-      width: clamp(220px, 24vw, 340px);
+      width: clamp(220px, 26vw, 360px);
       aspect-ratio: 3 / 4;
       display: flex;
       flex-direction: column;
@@ -308,8 +582,141 @@ class DetailOverlayWriter:
       color: rgba(255, 227, 185, 0.84);
     }}
 
+    .wb-stage__status {{
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      margin-top: auto;
+      padding: clamp(16px, 1.8vh, 22px);
+      border-radius: clamp(24px, 2vw, 30px);
+      background:
+        linear-gradient(180deg, rgba(14, 12, 22, 0.12), rgba(14, 12, 22, 0.72)),
+        linear-gradient(180deg, rgba(255, 252, 247, 0.18), rgba(248, 235, 219, 0.06));
+      border: 1px solid rgba(255, 235, 204, 0.18);
+      box-shadow:
+        0 24px 54px rgba(12, 10, 24, 0.22),
+        0 0 0 1px rgba(255, 255, 255, 0.04),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(10px);
+    }}
+
+    .wb-stage__eyebrow {{
+      margin: 0 0 8px;
+      font-size: clamp(11px, 0.95vw, 13px);
+      line-height: 1.4;
+      font-weight: 900;
+      letter-spacing: 0.18em;
+      color: rgba(255, 228, 194, 0.86);
+    }}
+
+    .wb-stage__name {{
+      margin: 0;
+      font-size: clamp(30px, 2.8vw, 42px);
+      line-height: 1.04;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      color: #fffaf4;
+      text-shadow: 0 10px 24px rgba(18, 14, 26, 0.34);
+    }}
+
+    .wb-stage__title {{
+      margin: 10px 0 0;
+      font-size: clamp(13px, 1.08vw, 16px);
+      line-height: 1.45;
+      font-weight: 600;
+      color: rgba(255, 235, 208, 0.92);
+    }}
+
+    .wb-stage__hp {{
+      margin-top: 16px;
+    }}
+
+    .wb-stage__hp-meta {{
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }}
+
+    .wb-stage__hp-label {{
+      font-size: clamp(11px, 0.92vw, 13px);
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      color: rgba(255, 229, 194, 0.84);
+    }}
+
+    .wb-stage__hp-value {{
+      font-size: clamp(12px, 1vw, 14px);
+      font-weight: 800;
+      color: #fff6ed;
+    }}
+
+    .wb-stage__hp-track {{
+      position: relative;
+      height: 12px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(22, 19, 34, 0.46);
+      box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.24);
+    }}
+
+    .wb-stage__hp-fill {{
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--wb-bar-a), var(--wb-bar-b) 52%, var(--wb-bar-c));
+      box-shadow:
+        0 0 18px var(--wb-panel-glow),
+        inset 0 1px 0 rgba(255, 255, 255, 0.24);
+    }}
+
+    .wb-stage__chips {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }}
+
+    .wb-stage__chip {{
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(17, 15, 26, 0.42);
+      border: 1px solid rgba(255, 231, 197, 0.18);
+      color: #fff8ef;
+      font-size: clamp(11px, 0.94vw, 13px);
+      line-height: 1.35;
+      font-weight: 700;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }}
+
+    .wb-stage__chip--race {{
+      background: linear-gradient(180deg, rgba(92, 68, 20, 0.92), rgba(54, 38, 12, 0.96));
+      border-color: rgba(255, 219, 138, 0.30);
+      color: #fff7e8;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 10px 24px rgba(255, 176, 82, 0.16);
+    }}
+
+    .wb-stage__chip--race {{
+      background: linear-gradient(180deg, rgba(92, 68, 20, 0.92), rgba(54, 38, 12, 0.96));
+      border-color: rgba(255, 219, 138, 0.30);
+      color: #fff7e8;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 10px 24px rgba(255, 176, 82, 0.16);
+    }}
+
     .wb-stage--recruiting .wb-stage__figure {{
       animation-duration: 6.2s;
+    }}
+
+    .wb-stage--recruiting .wb-stage__backdrop,
+    .wb-stage--recruiting .wb-stage__aura {{
+      animation-duration: 5.8s;
     }}
 
     .wb-stage--recruiting .wb-stage__motion {{
@@ -318,6 +725,69 @@ class DetailOverlayWriter:
 
     .wb-stage--attack .wb-stage__pose {{
       animation: wb-attack 2.6s cubic-bezier(0.24, 0.78, 0.22, 1.0) infinite;
+    }}
+
+    .wb-stage--attack .wb-stage__impact,
+    .wb-stage--impacting .wb-stage__impact {{
+      animation: wb-impact-flash 2.6s cubic-bezier(0.18, 0.88, 0.22, 1.0) infinite;
+    }}
+
+    .wb-stage--phase-2 .wb-stage__panel {{
+      box-shadow:
+        0 30px 80px rgba(12, 10, 24, 0.26),
+        0 0 46px var(--wb-panel-glow),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    }}
+
+    .wb-stage--phase-3 .wb-stage__backdrop {{
+      filter: blur(38px);
+      opacity: 0.9;
+    }}
+
+    .wb-stage--last-stand .wb-stage__panel {{
+      border-color: rgba(255, 214, 170, 0.34);
+      box-shadow:
+        0 30px 80px rgba(36, 8, 18, 0.34),
+        0 0 58px rgba(255, 122, 76, 0.18),
+        inset 0 0 0 1px rgba(255, 214, 170, 0.10);
+    }}
+
+    .wb-stage--last-stand .wb-stage__phase {{
+      letter-spacing: 0.22em;
+    }}
+
+    .wb-stage--race-focus .wb-stage__status {{
+      border-color: rgba(255, 221, 154, 0.28);
+      box-shadow:
+        0 24px 54px rgba(12, 10, 24, 0.22),
+        0 0 0 1px rgba(255, 221, 154, 0.08),
+        inset 0 1px 0 rgba(255, 250, 224, 0.14);
+    }}
+
+    .wb-stage--aoe .wb-stage__impact {{
+      animation: wb-impact-aoe 1.8s cubic-bezier(0.2, 0.88, 0.24, 1.0) infinite;
+    }}
+
+    .wb-stage--critical .wb-stage__event,
+    .wb-stage--victory-flash .wb-stage__event,
+    .wb-stage--timeout-flash .wb-stage__event,
+    .wb-stage--enrage-flash .wb-stage__event,
+    .wb-stage--recruiting-flash .wb-stage__event {{
+      animation: wb-banner-flash 1.05s ease-in-out infinite alternate;
+    }}
+
+    .wb-stage--downed .wb-stage__status {{
+      border-color: rgba(255, 184, 152, 0.28);
+      box-shadow:
+        0 24px 54px rgba(30, 8, 16, 0.30),
+        inset 0 1px 0 rgba(255, 215, 193, 0.10);
+    }}
+
+    .wb-stage--recover .wb-stage__status {{
+      border-color: rgba(170, 244, 210, 0.26);
+      box-shadow:
+        0 24px 54px rgba(10, 32, 24, 0.24),
+        inset 0 1px 0 rgba(210, 255, 233, 0.10);
     }}
 
     .wb-stage--victory .wb-stage__figure {{
@@ -330,6 +800,10 @@ class DetailOverlayWriter:
 
     .wb-stage--timeout .wb-stage__pose {{
       animation: wb-timeout 6.2s cubic-bezier(0.38, 0.06, 0.3, 0.98) infinite;
+    }}
+
+    .wb-stage--timeout .wb-stage__status {{
+      border-color: rgba(190, 198, 218, 0.22);
     }}
 
     @keyframes wb-float {{
@@ -356,6 +830,20 @@ class DetailOverlayWriter:
       80% {{ transform: translate3d(2px, -1px, 0) rotate(0.14deg) scale(1.005); }}
     }}
 
+    @keyframes wb-impact-flash {{
+      0%, 20%, 100% {{ opacity: 0; transform: translate3d(-50%, 0, 0) scale(0.68); }}
+      34% {{ opacity: 0.14; transform: translate3d(-50%, -3px, 0) scale(0.92); }}
+      48% {{ opacity: 0.34; transform: translate3d(-50%, -6px, 0) scale(1.12); }}
+      62% {{ opacity: 0.08; transform: translate3d(-50%, -4px, 0) scale(1.22); }}
+    }}
+
+    @keyframes wb-impact-aoe {{
+      0%, 18%, 100% {{ opacity: 0; transform: translate3d(-50%, 0, 0) scale(0.54); }}
+      34% {{ opacity: 0.18; transform: translate3d(-50%, -6px, 0) scale(0.96); }}
+      50% {{ opacity: 0.32; transform: translate3d(-50%, -10px, 0) scale(1.32); }}
+      72% {{ opacity: 0.04; transform: translate3d(-50%, -6px, 0) scale(1.58); }}
+    }}
+
     @keyframes wb-victory {{
       0%, 100% {{ transform: translate3d(0, 0, 0) scale(1); }}
       22% {{ transform: translate3d(0, -6px, 0) scale(1.01); }}
@@ -370,10 +858,52 @@ class DetailOverlayWriter:
       78% {{ transform: translate3d(-4px, 8px, 0) rotate(-0.5deg) scale(0.99); }}
     }}
 
+    @keyframes wb-aura-breathe {{
+      0%, 100% {{ transform: translate3d(0, 0, 0) scale(0.98); opacity: 0.76; }}
+      30% {{ transform: translate3d(0, -4px, 0) scale(1.04); opacity: 0.84; }}
+      56% {{ transform: translate3d(0, -6px, 0) scale(1.09); opacity: 0.88; }}
+      80% {{ transform: translate3d(0, -2px, 0) scale(1.03); opacity: 0.8; }}
+    }}
+
+    @keyframes wb-backdrop-pulse {{
+      0%, 100% {{ opacity: 0.74; transform: translate3d(0, 0, 0) scale(0.98); }}
+      28% {{ opacity: 0.8; transform: translate3d(-6px, -4px, 0) scale(1.005); }}
+      58% {{ opacity: 0.86; transform: translate3d(4px, -8px, 0) scale(1.018); }}
+      82% {{ opacity: 0.78; transform: translate3d(2px, -2px, 0) scale(0.992); }}
+    }}
+
+    @keyframes wb-shadow-drift {{
+      0%, 100% {{ transform: translate3d(-50%, 0, 0) scaleX(1) scaleY(1); opacity: 0.34; }}
+      38% {{ transform: translate3d(-50%, 0, 0) scaleX(0.94) scaleY(0.9); opacity: 0.26; }}
+      64% {{ transform: translate3d(-50%, 0, 0) scaleX(0.97) scaleY(0.94); opacity: 0.29; }}
+    }}
+
+    @keyframes wb-banner-flash {{
+      0% {{ transform: translate3d(0, 0, 0); box-shadow: 0 14px 32px rgba(8, 7, 14, 0.24); }}
+      100% {{ transform: translate3d(0, -2px, 0); box-shadow: 0 18px 40px rgba(255, 164, 91, 0.24); }}
+    }}
+
     @media (max-width: 720px) {{
+      .wb-stage {{
+        width: min(100%, 100vw);
+      }}
+
+      .wb-stage__panel {{
+        width: 100%;
+        padding: 14px;
+      }}
+
       .wb-stage__figure {{
         width: min(100%, 420px);
         height: min(76vh, 680px);
+      }}
+
+      .wb-stage__name {{
+        font-size: 26px;
+      }}
+
+      .wb-stage__event {{
+        max-width: 100%;
       }}
     }}
   </style>
@@ -381,14 +911,47 @@ class DetailOverlayWriter:
 <body>
   <main class="wb-stage-shell" aria-label="{safe_title}">
     <aside id="wb-stage" class="wb-stage is-hidden">
-      <div class="wb-stage__figure">
-        <div class="wb-stage__motion">
-          <div class="wb-stage__pose">
-            <img id="wb-stage-art" class="wb-stage__art is-hidden" alt="" loading="eager">
-            <div id="wb-stage-fallback" class="wb-stage__fallback is-hidden" aria-hidden="true">
-              <span class="wb-stage__fallback-main">WB</span>
-              <span class="wb-stage__fallback-sub">WORLD BOSS</span>
+      <div class="wb-stage__backdrop"></div>
+      <div class="wb-stage__panel">
+        <div class="wb-stage__signal">
+          <div id="wb-stage-phase-row" class="wb-stage__phase-row is-hidden">
+            <span id="wb-stage-phase" class="wb-stage__phase"></span>
+          </div>
+          <div id="wb-stage-event" class="wb-stage__event is-hidden"></div>
+        </div>
+        <div class="wb-stage__figure-wrap">
+          <div class="wb-stage__aura"></div>
+          <div class="wb-stage__impact"></div>
+          <div class="wb-stage__shadow"></div>
+          <div class="wb-stage__figure">
+            <div class="wb-stage__motion">
+              <div class="wb-stage__pose">
+                <img id="wb-stage-art" class="wb-stage__art is-hidden" alt="" loading="eager">
+                <div id="wb-stage-fallback" class="wb-stage__fallback is-hidden" aria-hidden="true">
+                  <span class="wb-stage__fallback-main">WB</span>
+                  <span class="wb-stage__fallback-sub">WORLD BOSS</span>
+                </div>
+              </div>
             </div>
+          </div>
+        </div>
+        <div class="wb-stage__status">
+          <p class="wb-stage__eyebrow">WORLD BOSS</p>
+          <h1 id="wb-stage-name" class="wb-stage__name">WORLD BOSS</h1>
+          <p id="wb-stage-title" class="wb-stage__title is-hidden"></p>
+          <div id="wb-stage-hp" class="wb-stage__hp is-hidden">
+            <div class="wb-stage__hp-meta">
+              <span class="wb-stage__hp-label">HP</span>
+              <span id="wb-stage-hp-value" class="wb-stage__hp-value"></span>
+            </div>
+            <div class="wb-stage__hp-track">
+              <div id="wb-stage-hp-fill" class="wb-stage__hp-fill"></div>
+            </div>
+          </div>
+          <div class="wb-stage__chips">
+            <span id="wb-stage-status" class="wb-stage__chip is-hidden"></span>
+            <span id="wb-stage-participants" class="wb-stage__chip is-hidden"></span>
+            <span id="wb-stage-ranking" class="wb-stage__chip is-hidden"></span>
           </div>
         </div>
       </div>
@@ -399,6 +962,17 @@ class DetailOverlayWriter:
       const stage = document.getElementById("wb-stage");
       const art = document.getElementById("wb-stage-art");
       const fallback = document.getElementById("wb-stage-fallback");
+      const phaseRow = document.getElementById("wb-stage-phase-row");
+      const phaseLabel = document.getElementById("wb-stage-phase");
+      const eventBanner = document.getElementById("wb-stage-event");
+      const bossName = document.getElementById("wb-stage-name");
+      const bossTitle = document.getElementById("wb-stage-title");
+      const hpWrap = document.getElementById("wb-stage-hp");
+      const hpValue = document.getElementById("wb-stage-hp-value");
+      const hpFill = document.getElementById("wb-stage-hp-fill");
+      const statusChip = document.getElementById("wb-stage-status");
+      const participantsChip = document.getElementById("wb-stage-participants");
+      const rankingChip = document.getElementById("wb-stage-ranking");
       const source = "{state_name}";
       let loading = false;
       let lastState = null;
@@ -440,6 +1014,66 @@ class DetailOverlayWriter:
         preloader.src = visualUrl;
       }};
 
+      const applyChip = (element, text) => {{
+        if (!element) {{
+          return;
+        }}
+        const value = String(text || "").trim();
+        element.textContent = value;
+        element.classList.toggle("is-hidden", !value);
+      }};
+
+      const deriveStageClasses = (payload) => {{
+        const classes = [];
+        const safePhase = String(payload.phase || "").trim();
+        const safePhaseId = String(payload.phaseId || "").trim();
+        const safeEventKind = String(payload.eventKind || "").trim();
+        const raceFocusActive = Boolean(payload.raceFocusActive);
+        const eventClassMap = {{
+          attack: "wb-stage--impacting",
+          aoe: "wb-stage--aoe",
+          critical: "wb-stage--critical",
+          down: "wb-stage--downed",
+          recover: "wb-stage--recover",
+          enrage: "wb-stage--enrage-flash",
+          start: "wb-stage--start",
+          victory: "wb-stage--victory-flash",
+          timeout: "wb-stage--timeout-flash",
+          ranking: "wb-stage--ranking",
+          recruiting: "wb-stage--recruiting-flash",
+        }};
+        if (safePhase === "recruiting") {{
+          classes.push("wb-stage--recruiting");
+        }} else if (safePhase === "active") {{
+          classes.push("wb-stage--active", "wb-stage--phase-1");
+        }} else if (safePhase === "cooldown") {{
+          classes.push("wb-stage--cooldown");
+        }}
+        if (safePhaseId === "phase_2" || safePhaseId === "last_stand") {{
+          classes.push("wb-stage--phase-2");
+        }}
+        if (safePhaseId === "last_stand") {{
+          classes.push("wb-stage--phase-3", "wb-stage--last-stand", "wb-stage--enrage");
+        }}
+        if (["attack", "aoe", "start"].includes(safeEventKind)) {{
+          classes.push("wb-stage--attack");
+        }}
+        if (safeEventKind === "down") {{
+          classes.push("wb-stage--danger");
+        }}
+        if (safeEventKind === "enrage") {{
+          classes.push("wb-stage--enrage");
+        }}
+        const eventClass = eventClassMap[safeEventKind];
+        if (eventClass) {{
+          classes.push(eventClass);
+        }}
+        if (raceFocusActive) {{
+          classes.push("wb-stage--race-focus");
+        }}
+        return classes;
+      }};
+
       const syncStaleVisibility = () => {{
         if (!lastState || !lastState.showStage || !(Number(lastState.generatedAtEpoch) > 0)) {{
           setStageVisibility(false);
@@ -457,8 +1091,64 @@ class DetailOverlayWriter:
 
         lastState = payload;
         const stageClasses = Array.isArray(payload.stageClasses) ? payload.stageClasses : [];
-        stage.className = ["wb-stage", ...stageClasses].join(" ").trim();
-        applyVisual(String(payload.visualUrl || ""), String(payload.bossName || ""));
+        const derivedStageClasses = deriveStageClasses(payload);
+        const mergedStageClasses = Array.from(new Set(["wb-stage", ...stageClasses, ...derivedStageClasses]));
+        stage.className = mergedStageClasses.join(" ").trim();
+        const safeBossName = String(payload.bossName || "").trim() || "WORLD BOSS";
+        const safeBossTitle = String(payload.bossTitle || "").trim();
+        const safePhaseId = String(payload.phaseId || "").trim();
+        const safePhaseLabel = String(payload.phaseLabel || "").trim() || {{
+          entry_open: "ENTRY OPEN",
+          phase_1: "PHASE 1",
+          phase_2: "PHASE 2",
+          last_stand: "LAST STAND",
+          boss_down: "BOSS DOWN",
+          time_over: "TIME OVER",
+          cooldown: "COOLDOWN",
+        }}[safePhaseId] || "";
+        const safeEventText = String(payload.eventText || "").trim();
+        const safeEventKind = String(payload.eventKind || "").trim();
+        const safeHpText = String(payload.hpText || "").trim();
+        const safeHpPct = Math.max(0, Math.min(100, Number(payload.hpPct || 0)));
+        const safeRaceFocusActive = Boolean(payload.raceFocusActive);
+        const safeRaceText = String(payload.raceText || "").trim();
+
+        bossName.textContent = safeBossName;
+        bossTitle.textContent = safeBossTitle;
+        bossTitle.classList.toggle("is-hidden", !safeBossTitle);
+
+        phaseLabel.textContent = safePhaseLabel;
+        phaseRow.classList.toggle("is-hidden", !safePhaseLabel);
+
+        eventBanner.textContent = safeEventText;
+        eventBanner.className = [
+          "wb-stage__event",
+          safeEventKind ? `wb-stage__event--${{safeEventKind}}` : "",
+          !safeEventText ? "is-hidden" : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
+
+        hpValue.textContent = safeHpText;
+        hpFill.style.width = `${{safeHpPct}}%`;
+        hpWrap.classList.toggle("is-hidden", !safeHpText);
+
+        applyChip(statusChip, String(payload.statusText || ""));
+        applyChip(
+          participantsChip,
+          payload.participantsText ? `参加 ${{String(payload.participantsText)}}` : "",
+        );
+        applyChip(
+          rankingChip,
+          safeRaceFocusActive && safeRaceText
+            ? `争い ${{safeRaceText}}`
+            : payload.rankingText
+              ? `順位 ${{String(payload.rankingText)}}`
+              : "",
+        );
+        rankingChip.classList.toggle("wb-stage__chip--race", safeRaceFocusActive && !!safeRaceText);
+
+        applyVisual(String(payload.visualUrl || ""), safeBossName);
         syncStaleVisibility();
       }};
 
@@ -602,6 +1292,19 @@ class DetailOverlayWriter:
             "showStage": bool(state and state.show_stage),
             "bossName": state.boss_name if state else "WORLD BOSS",
             "bossTitle": state.boss_title if state else "",
+            "bossId": state.boss_id if state else "",
+            "phase": state.phase if state else "",
+            "phaseId": state.phase_id if state else "",
+            "phaseLabel": state.phase_label if state else "",
+            "eventText": state.event_text if state else "",
+            "eventKind": state.event_kind if state else "",
+            "statusText": state.status_text if state else "",
+            "hpText": state.hp_text if state else "",
+            "hpPct": state.hp_pct if state else 0,
+            "participantsText": state.participants_text if state else "",
+            "rankingText": state.ranking_text if state else "",
+            "raceFocusActive": bool(state and state.race_focus_active),
+            "raceText": state.race_text if state else "",
             "stageClasses": list(state.stage_classes) if state else [],
             "visualUrl": state.visual_url if state else "",
         }
@@ -671,6 +1374,19 @@ class DetailOverlayWriter:
                     entries.append(OverlayEntry(kind="spacer"))
                 continue
 
+            if line.startswith("meta:"):
+                payload = line.split(":", 1)[1].strip()
+                label, value = self._split_kv_payload(payload)
+                if label and value:
+                    entries.append(
+                        OverlayEntry(
+                            kind="meta",
+                            label=label,
+                            value=value,
+                        )
+                    )
+                continue
+
             if not line:
                 entries.append(OverlayEntry(kind="spacer"))
                 continue
@@ -691,6 +1407,8 @@ class DetailOverlayWriter:
             if entry.kind == "section":
                 prefix = "! " if entry.alert else ""
                 lines.append(f"[{prefix}{entry.text}]")
+                continue
+            if entry.kind == "meta":
                 continue
             if entry.kind == "kv":
                 prefix = "! " if entry.alert else ""
@@ -715,6 +1433,9 @@ class DetailOverlayWriter:
                     f"<span class=\"section-text\">{escape(entry.text)}</span>"
                     "</div>"
                 )
+                continue
+
+            if entry.kind == "meta":
                 continue
 
             if entry.kind == "kv":
@@ -762,6 +1483,12 @@ class DetailOverlayWriter:
     def _find_first_kv_value(self, entries: List[OverlayEntry], label: str) -> str:
         for entry in entries:
             if entry.kind == "kv" and entry.label == label:
+                return entry.value
+        return ""
+
+    def _find_first_meta_value(self, entries: List[OverlayEntry], label: str) -> str:
+        for entry in entries:
+            if entry.kind == "meta" and entry.label == label:
                 return entry.value
         return ""
 
@@ -820,6 +1547,106 @@ class DetailOverlayWriter:
             if candidate_name and candidate_name == safe_boss_name:
                 return str(candidate_boss_id or "").strip()
         return ""
+
+    def _get_world_boss_theme_class(self, boss_id: str) -> str:
+        theme_classes = {
+            "crimson_beetle_emperor": "wb-theme--crimson",
+            "moon_ruin_overseer": "wb-theme--moon",
+            "witch_style_hexamia": "wb-theme--witch",
+            "fencer_style_raphaela": "wb-theme--fencer",
+        }
+        return theme_classes.get(str(boss_id or "").strip(), "wb-theme--default")
+
+    def _build_world_boss_phase_label(
+        self,
+        *,
+        title: str,
+        status_text: str,
+        result_text: str,
+        hp_pct: int,
+        phase_blob: str,
+    ) -> str:
+        safe_title = str(title or "").strip()
+        safe_status = str(status_text or "").strip()
+        safe_result = str(result_text or "").strip()
+        safe_blob = str(phase_blob or "").strip()
+
+        if "ワールドボス出現" in safe_title or "募集中" in safe_status:
+            return "ENTRY OPEN"
+        if "討伐成功" in safe_result or "討伐成功" in safe_blob:
+            return "BOSS DOWN"
+        if "時間切れ" in safe_result or "時間切れ" in safe_blob:
+            return "TIME OVER"
+        if "クールダウン" in safe_status:
+            return "COOLDOWN"
+        if "戦闘中" not in safe_status and hp_pct <= 0:
+            return ""
+
+        if hp_pct > 35:
+            phase_label = "PHASE 2" if hp_pct <= 70 else "PHASE 1"
+        elif hp_pct > 15:
+            phase_label = "PHASE 3"
+        else:
+            phase_label = "LAST STAND"
+
+        if any(keyword in safe_blob for keyword in ("WB激昂", "激昂", "怒りの全体攻撃")) or (
+            0 < hp_pct <= 25
+        ):
+            if phase_label == "LAST STAND":
+                return "LAST STAND / ENRAGED"
+            return f"{phase_label} / ENRAGED"
+        return phase_label
+
+    def _shorten_world_boss_event_text(self, text: str, *, limit: int = 54) -> str:
+        safe_text = str(text or "").strip()
+        if len(safe_text) <= limit:
+            return safe_text
+        return safe_text[: max(0, limit - 1)].rstrip() + "…"
+
+    def _build_world_boss_event_state(
+        self,
+        *,
+        title: str,
+        status_text: str,
+        result_text: str,
+        explicit_event_text: str,
+        recent_logs: List[str],
+    ) -> tuple[str, str]:
+        candidates = [
+            str(explicit_event_text or "").strip(),
+            *(str(log_line).strip() for log_line in reversed(recent_logs) if str(log_line).strip()),
+            str(result_text or "").strip(),
+            str(status_text or "").strip(),
+            str(title or "").strip(),
+        ]
+
+        for raw_line in candidates:
+            if not raw_line:
+                continue
+            if "WB全体攻撃" in raw_line or "怒りの全体攻撃" in raw_line:
+                return "aoe", self._shorten_world_boss_event_text(raw_line)
+            if "会心" in raw_line:
+                return "critical", self._shorten_world_boss_event_text(raw_line)
+            if "WB撃破:" in raw_line or "戦闘不能" in raw_line or "離脱:" in raw_line:
+                return "down", self._shorten_world_boss_event_text(raw_line)
+            if "復帰:" in raw_line:
+                return "recover", self._shorten_world_boss_event_text(raw_line)
+            if "WB激昂" in raw_line or "激昂" in raw_line:
+                return "enrage", self._shorten_world_boss_event_text(raw_line)
+            if "戦闘開始" in raw_line:
+                return "start", self._shorten_world_boss_event_text(raw_line)
+            if "WB攻撃:" in raw_line:
+                return "attack", self._shorten_world_boss_event_text(raw_line)
+            if "総合貢献王 " in raw_line or "MVP " in raw_line or "最多貢献" in raw_line:
+                return "ranking", self._shorten_world_boss_event_text(raw_line)
+            if "討伐成功" in raw_line:
+                return "victory", self._shorten_world_boss_event_text(raw_line)
+            if "時間切れ" in raw_line:
+                return "timeout", self._shorten_world_boss_event_text(raw_line)
+            if "募集中" in raw_line:
+                return "recruiting", self._shorten_world_boss_event_text(raw_line)
+
+        return "", ""
 
     def _resolve_configured_world_boss_visual_paths(self, html_dir: Path, boss_id: str) -> List[Path]:
         safe_boss_id = str(boss_id or "").strip()
@@ -930,8 +1757,25 @@ class DetailOverlayWriter:
         result_text = self._find_first_kv_value(entries, "結果")
         status_text = self._find_first_kv_value(entries, "状態")
         hp_text = self._find_first_kv_value(entries, "HP")
-        participants_text = self._find_first_kv_value(entries, "参加人数")
-        ranking_text = self._find_first_kv_value(entries, "順位")
+        participants_text = self._find_first_meta_value(entries, "wb_participants_text") or self._find_first_kv_value(
+            entries, "参加人数"
+        )
+        ranking_text = self._find_first_meta_value(entries, "wb_ranking_text") or self._find_first_kv_value(
+            entries, "順位"
+        )
+        phase = self._find_first_meta_value(entries, "wb_phase")
+        phase_id = self._find_first_meta_value(entries, "wb_phase_id")
+        explicit_boss_id = self._find_first_meta_value(entries, "wb_boss_id")
+        explicit_event_kind = self._find_first_meta_value(entries, "wb_event_kind")
+        explicit_race_focus_active = self._find_first_meta_value(entries, "wb_race_focus_active")
+        explicit_race_text = self._find_first_meta_value(entries, "wb_race_text") or self._find_first_kv_value(
+            entries, "総合貢献王争い"
+        )
+        explicit_event_text = self._find_first_meta_value(entries, "wb_event_text") or self._find_first_kv_value(
+            entries, "イベント"
+        )
+        explicit_show_stage = self._find_first_meta_value(entries, "wb_show_stage")
+        explicit_phase_label = self._find_first_kv_value(entries, "フェーズ")
         recent_logs = self._collect_section_values(entries, "直近ログ")
         boss_name, boss_title = self._split_boss_heading(wb_heading)
 
@@ -942,6 +1786,7 @@ class DetailOverlayWriter:
             if title_tail and not title_tail.startswith("!wb"):
                 boss_name = title_tail
 
+        boss_id = str(explicit_boss_id or "").strip() or self._guess_world_boss_id(boss_name)
         hp_current, hp_max, hp_pct = self._extract_hp_metrics(hp_text)
 
         phase_blob = " ".join(
@@ -954,9 +1799,53 @@ class DetailOverlayWriter:
             )
             if part
         )
+        phase_label_map = {
+            "idle": "",
+            "entry_open": "ENTRY OPEN",
+            "phase_1": "PHASE 1",
+            "phase_2": "PHASE 2",
+            "last_stand": "LAST STAND",
+            "boss_down": "BOSS DOWN",
+            "time_over": "TIME OVER",
+            "cooldown": "COOLDOWN",
+        }
+        phase_label = (
+            explicit_phase_label
+            or phase_label_map.get(str(phase_id or "").strip(), "")
+            or self._build_world_boss_phase_label(
+                title=title,
+                status_text=status_text,
+                result_text=result_text,
+                hp_pct=hp_pct,
+                phase_blob=phase_blob,
+            )
+        )
+        if explicit_event_kind or explicit_event_text:
+            event_kind = str(explicit_event_kind or "").strip()
+            event_text = self._shorten_world_boss_event_text(explicit_event_text)
+        else:
+            event_kind, event_text = self._build_world_boss_event_state(
+                title=title,
+                status_text=status_text,
+                result_text=result_text,
+                explicit_event_text=explicit_event_text,
+                recent_logs=recent_logs,
+            )
 
-        stage_classes: List[str] = ["wb-stage--idle"]
-        if "募集中" in status_text or "ワールドボス出現" in title:
+        stage_classes: List[str] = ["wb-stage--idle", self._get_world_boss_theme_class(boss_id)]
+        safe_phase = str(phase or "").strip()
+        safe_phase_id = str(phase_id or "").strip()
+        if safe_phase == "recruiting":
+            stage_classes.append("wb-stage--recruiting")
+        elif safe_phase == "active":
+            stage_classes.append("wb-stage--active")
+        elif safe_phase == "cooldown" and ("討伐成功" in result_text or "討伐成功" in phase_blob):
+            stage_classes.append("wb-stage--victory")
+        elif safe_phase == "cooldown" and ("時間切れ" in result_text or "時間切れ" in phase_blob):
+            stage_classes.append("wb-stage--timeout")
+        elif safe_phase == "cooldown":
+            stage_classes.append("wb-stage--cooldown")
+        elif "募集中" in status_text or "ワールドボス出現" in title:
             stage_classes.append("wb-stage--recruiting")
         elif "戦闘中" in status_text:
             stage_classes.append("wb-stage--active")
@@ -967,12 +1856,45 @@ class DetailOverlayWriter:
         elif "クールダウン" in status_text:
             stage_classes.append("wb-stage--cooldown")
 
-        if any(keyword in phase_blob for keyword in ("WB攻撃", "全体攻撃", "戦闘開始", "スキル発動")):
+        if safe_phase == "active" or "戦闘中" in status_text:
+            stage_classes.append("wb-stage--phase-1")
+            if safe_phase_id in {"phase_2", "last_stand"} or 0 < hp_pct <= 70:
+                stage_classes.append("wb-stage--phase-2")
+            if safe_phase_id == "last_stand" or 0 < hp_pct <= 35:
+                stage_classes.append("wb-stage--phase-3")
+            if safe_phase_id == "last_stand" or 0 < hp_pct <= 15:
+                stage_classes.append("wb-stage--last-stand")
+
+        if event_kind in {"attack", "aoe", "start"} or any(
+            keyword in phase_blob for keyword in ("WB攻撃", "全体攻撃", "戦闘開始", "スキル発動")
+        ):
             stage_classes.append("wb-stage--attack")
-        if any(keyword in phase_blob for keyword in ("激昂", "怒りの全体攻撃")) or (0 < hp_pct <= 25):
+        if event_kind == "enrage" or safe_phase_id == "last_stand" or any(
+            keyword in phase_blob for keyword in ("激昂", "怒りの全体攻撃")
+        ) or (0 < hp_pct <= 25):
             stage_classes.append("wb-stage--enrage")
-        if "離脱" in phase_blob:
+        if event_kind == "down" or "離脱" in phase_blob:
             stage_classes.append("wb-stage--danger")
+        event_class_map = {
+            "attack": "wb-stage--impacting",
+            "aoe": "wb-stage--aoe",
+            "critical": "wb-stage--critical",
+            "down": "wb-stage--downed",
+            "recover": "wb-stage--recover",
+            "enrage": "wb-stage--enrage-flash",
+            "start": "wb-stage--start",
+            "victory": "wb-stage--victory-flash",
+            "timeout": "wb-stage--timeout-flash",
+            "ranking": "wb-stage--ranking",
+            "recruiting": "wb-stage--recruiting-flash",
+        }
+        event_class = event_class_map.get(event_kind)
+        if event_class:
+            stage_classes.append(event_class)
+        race_focus_active = str(explicit_race_focus_active or "").strip() not in {"", "0", "false", "False"}
+        race_text = str(explicit_race_text or "").strip()
+        if race_focus_active and race_text:
+            stage_classes.append("wb-stage--race-focus")
 
         deduped_classes: List[str] = []
         for stage_class in stage_classes:
@@ -985,10 +1907,14 @@ class DetailOverlayWriter:
             result_text,
             status_text,
         )
+        if explicit_show_stage:
+            show_stage = str(explicit_show_stage).strip() not in {"0", "false", "False"}
 
         return WorldBossOverlayState(
             boss_name=boss_name,
             boss_title=boss_title,
+            phase=safe_phase,
+            phase_id=safe_phase_id,
             status_text=status_text,
             result_text=result_text,
             hp_text=hp_text,
@@ -1000,9 +1926,15 @@ class DetailOverlayWriter:
             recent_logs=recent_logs[-3:],
             stage_classes=deduped_classes,
             show_stage=show_stage,
+            boss_id=boss_id,
+            phase_label=phase_label,
+            event_text=event_text,
+            event_kind=event_kind,
+            race_focus_active=race_focus_active,
+            race_text=race_text,
             visual_url=(
                 self._resolve_world_boss_visual_url(
-                    boss_id=self._guess_world_boss_id(boss_name),
+                    boss_id=boss_id,
                     boss_name=boss_name,
                 )
                 if show_stage
@@ -1042,7 +1974,13 @@ class DetailOverlayWriter:
                 f"参加 {escape(state.participants_text)}"
                 "</span>"
             )
-        if state.ranking_text:
+        if state.race_focus_active and state.race_text:
+            chips.append(
+                "<span class=\"wb-stage__chip wb-stage__chip--race\">"
+                f"争い {escape(state.race_text)}"
+                "</span>"
+            )
+        elif state.ranking_text:
             chips.append(
                 "<span class=\"wb-stage__chip\">"
                 f"順位 {escape(state.ranking_text)}"
@@ -1090,13 +2028,34 @@ class DetailOverlayWriter:
             stage_class_parts.append("wb-stage--visual-only")
         stage_class = " ".join(stage_class_parts).strip()
         chips_markup = "".join(chips)
+        phase_markup = ""
+        if state.phase_label:
+            phase_markup = (
+                "<div class=\"wb-stage__phase-row\">"
+                f"<span class=\"wb-stage__phase\">{escape(state.phase_label)}</span>"
+                "</div>"
+            )
+        event_markup = ""
+        if state.event_text:
+            event_kind_class = (
+                f" wb-stage__event--{escape(state.event_kind)}"
+                if state.event_kind
+                else ""
+            )
+            event_markup = (
+                f"<div class=\"wb-stage__event{event_kind_class}\">"
+                f"{escape(state.event_text)}"
+                "</div>"
+            )
         hud_markup = ""
         if include_hud:
             hud_markup = (
                 "<div class=\"wb-stage__hud\">"
                 "<p class=\"wb-stage__eyebrow\">WORLD BOSS</p>"
+                f"{phase_markup}"
                 f"<h1 class=\"wb-stage__name\">{escape(state.boss_name)}</h1>"
                 f"<p class=\"wb-stage__title\">{escape(subtitle)}</p>"
+                f"{event_markup}"
                 f"{hp_markup}"
                 f"<div class=\"wb-stage__chips\">{chips_markup}</div>"
                 f"{log_markup}"
@@ -1569,6 +2528,24 @@ class DetailOverlayWriter:
       align-items: stretch;
       justify-content: center;
       isolation: isolate;
+      --wb-theme-top: rgba(255, 210, 140, 0.54);
+      --wb-theme-left: rgba(255, 82, 82, 0.24);
+      --wb-theme-right: rgba(32, 104, 255, 0.22);
+      --wb-aura-core: rgba(255, 225, 167, 0.88);
+      --wb-aura-edge: rgba(255, 139, 79, 0.18);
+      --wb-impact-core: rgba(255, 242, 198, 0.42);
+      --wb-impact-mid: rgba(255, 189, 111, 0.24);
+      --wb-impact-edge: rgba(255, 122, 85, 0.12);
+      --wb-bar-a: #f9735c;
+      --wb-bar-b: #ffb357;
+      --wb-bar-c: #ffe27f;
+      --wb-phase-bg: rgba(15, 13, 24, 0.72);
+      --wb-phase-border: rgba(255, 231, 197, 0.22);
+      --wb-phase-text: rgba(255, 247, 234, 0.98);
+      --wb-event-bg: rgba(14, 12, 22, 0.72);
+      --wb-event-border: rgba(255, 231, 197, 0.22);
+      --wb-event-text: rgba(255, 245, 233, 0.98);
+      --wb-panel-glow: rgba(255, 182, 105, 0.24);
     }}
 
     html.wb-stage-stale .wb-stage {{
@@ -1578,6 +2555,66 @@ class DetailOverlayWriter:
     .wb-stage--visual-only {{
       width: min(100%, 560px);
       min-height: 100vh;
+    }}
+
+    .wb-stage.wb-theme--crimson {{
+      --wb-theme-top: rgba(255, 173, 120, 0.58);
+      --wb-theme-left: rgba(255, 88, 72, 0.30);
+      --wb-theme-right: rgba(255, 216, 102, 0.20);
+      --wb-aura-core: rgba(255, 214, 150, 0.92);
+      --wb-aura-edge: rgba(255, 103, 72, 0.26);
+      --wb-impact-core: rgba(255, 244, 194, 0.48);
+      --wb-impact-mid: rgba(255, 164, 78, 0.28);
+      --wb-impact-edge: rgba(255, 92, 74, 0.16);
+      --wb-bar-a: #ff6f4e;
+      --wb-bar-b: #ffb03f;
+      --wb-bar-c: #ffe182;
+      --wb-panel-glow: rgba(255, 131, 74, 0.28);
+    }}
+
+    .wb-stage.wb-theme--moon {{
+      --wb-theme-top: rgba(182, 225, 255, 0.54);
+      --wb-theme-left: rgba(94, 168, 255, 0.22);
+      --wb-theme-right: rgba(183, 209, 255, 0.30);
+      --wb-aura-core: rgba(214, 240, 255, 0.90);
+      --wb-aura-edge: rgba(118, 171, 255, 0.20);
+      --wb-impact-core: rgba(225, 247, 255, 0.42);
+      --wb-impact-mid: rgba(120, 182, 255, 0.24);
+      --wb-impact-edge: rgba(166, 212, 255, 0.16);
+      --wb-bar-a: #66a4ff;
+      --wb-bar-b: #7fd8ff;
+      --wb-bar-c: #d5f3ff;
+      --wb-panel-glow: rgba(116, 182, 255, 0.26);
+    }}
+
+    .wb-stage.wb-theme--witch {{
+      --wb-theme-top: rgba(255, 196, 148, 0.52);
+      --wb-theme-left: rgba(198, 88, 68, 0.24);
+      --wb-theme-right: rgba(255, 235, 167, 0.22);
+      --wb-aura-core: rgba(255, 226, 187, 0.90);
+      --wb-aura-edge: rgba(197, 78, 56, 0.22);
+      --wb-impact-core: rgba(255, 240, 196, 0.42);
+      --wb-impact-mid: rgba(255, 143, 94, 0.26);
+      --wb-impact-edge: rgba(98, 12, 10, 0.18);
+      --wb-bar-a: #f06b55;
+      --wb-bar-b: #ffb26e;
+      --wb-bar-c: #ffe2aa;
+      --wb-panel-glow: rgba(244, 122, 84, 0.26);
+    }}
+
+    .wb-stage.wb-theme--fencer {{
+      --wb-theme-top: rgba(255, 236, 178, 0.52);
+      --wb-theme-left: rgba(216, 190, 128, 0.22);
+      --wb-theme-right: rgba(245, 252, 255, 0.26);
+      --wb-aura-core: rgba(255, 244, 211, 0.90);
+      --wb-aura-edge: rgba(214, 191, 126, 0.20);
+      --wb-impact-core: rgba(255, 251, 219, 0.44);
+      --wb-impact-mid: rgba(255, 221, 136, 0.24);
+      --wb-impact-edge: rgba(198, 176, 118, 0.14);
+      --wb-bar-a: #e1bb66;
+      --wb-bar-b: #f7d991;
+      --wb-bar-c: #fff1c8;
+      --wb-panel-glow: rgba(236, 210, 129, 0.26);
     }}
 
     .wb-stage--visual-only .wb-stage__panel {{
@@ -1618,9 +2655,9 @@ class DetailOverlayWriter:
       inset: 10% 6% 12%;
       border-radius: 42px;
       background:
-        radial-gradient(circle at 50% 18%, rgba(255, 210, 140, 0.54), transparent 38%),
-        radial-gradient(circle at 28% 66%, rgba(255, 82, 82, 0.24), transparent 42%),
-        radial-gradient(circle at 74% 72%, rgba(32, 104, 255, 0.22), transparent 44%);
+        radial-gradient(circle at 50% 18%, var(--wb-theme-top), transparent 38%),
+        radial-gradient(circle at 28% 66%, var(--wb-theme-left), transparent 42%),
+        radial-gradient(circle at 74% 72%, var(--wb-theme-right), transparent 44%);
       filter: blur(34px);
       opacity: 0.82;
       transform: translate3d(0, 0, 0) scale(0.98);
@@ -1668,7 +2705,7 @@ class DetailOverlayWriter:
       inset: 12% 10% 24%;
       border-radius: 50%;
       background:
-        radial-gradient(circle at 50% 50%, rgba(255, 225, 167, 0.88), rgba(255, 139, 79, 0.18) 42%, transparent 72%);
+        radial-gradient(circle at 50% 50%, var(--wb-aura-core), var(--wb-aura-edge) 42%, transparent 72%);
       filter: blur(20px);
       opacity: 0.8;
       transform: translate3d(0, 0, 0) scale(0.98);
@@ -1701,7 +2738,7 @@ class DetailOverlayWriter:
       aspect-ratio: 1;
       border-radius: 50%;
       background:
-        radial-gradient(circle, rgba(255, 242, 198, 0.42) 0%, rgba(255, 189, 111, 0.24) 24%, rgba(255, 122, 85, 0.12) 42%, transparent 68%);
+        radial-gradient(circle, var(--wb-impact-core) 0%, var(--wb-impact-mid) 24%, var(--wb-impact-edge) 42%, transparent 68%);
       filter: blur(8px);
       opacity: 0;
       transform: translate3d(-50%, 0, 0) scale(0.68);
@@ -1817,6 +2854,31 @@ class DetailOverlayWriter:
       color: rgba(101, 66, 47, 0.88);
     }}
 
+    .wb-stage__phase-row {{
+      display: flex;
+      justify-content: flex-start;
+      margin-bottom: 10px;
+    }}
+
+    .wb-stage__phase {{
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      background: var(--wb-phase-bg);
+      border: 1px solid var(--wb-phase-border);
+      color: var(--wb-phase-text);
+      font-size: clamp(11px, 0.95vw, 13px);
+      line-height: 1.3;
+      font-weight: 900;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      box-shadow:
+        0 14px 32px rgba(8, 7, 14, 0.24),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }}
+
     .wb-stage__name {{
       margin: 0;
       font-size: clamp(26px, 2.6vw, 40px);
@@ -1833,6 +2895,62 @@ class DetailOverlayWriter:
       line-height: 1.45;
       font-weight: 600;
       color: rgba(255, 235, 208, 0.92);
+    }}
+
+    .wb-stage__event {{
+      width: fit-content;
+      max-width: 100%;
+      margin-top: 12px;
+      padding: 10px 14px;
+      border-radius: 18px;
+      background: var(--wb-event-bg);
+      border: 1px solid var(--wb-event-border);
+      color: var(--wb-event-text);
+      font-size: clamp(12px, 1.02vw, 14px);
+      line-height: 1.45;
+      font-weight: 800;
+      box-shadow:
+        0 16px 34px rgba(10, 8, 18, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+    }}
+
+    .wb-stage__event--critical {{
+      background: linear-gradient(180deg, rgba(118, 38, 10, 0.88), rgba(74, 18, 8, 0.92));
+      border-color: rgba(255, 214, 136, 0.34);
+    }}
+
+    .wb-stage__event--aoe,
+    .wb-stage__event--down,
+    .wb-stage__event--enrage {{
+      background: linear-gradient(180deg, rgba(120, 20, 18, 0.90), rgba(72, 12, 12, 0.94));
+      border-color: rgba(255, 178, 146, 0.34);
+    }}
+
+    .wb-stage__event--recover {{
+      background: linear-gradient(180deg, rgba(20, 94, 64, 0.84), rgba(12, 54, 42, 0.90));
+      border-color: rgba(172, 244, 212, 0.28);
+    }}
+
+    .wb-stage__event--start,
+    .wb-stage__event--recruiting {{
+      background: linear-gradient(180deg, rgba(20, 68, 112, 0.84), rgba(14, 34, 62, 0.90));
+      border-color: rgba(180, 224, 255, 0.28);
+    }}
+
+    .wb-stage__event--victory {{
+      background: linear-gradient(180deg, rgba(120, 88, 16, 0.88), rgba(76, 50, 10, 0.92));
+      border-color: rgba(255, 222, 146, 0.34);
+    }}
+
+    .wb-stage__event--timeout {{
+      background: linear-gradient(180deg, rgba(56, 58, 70, 0.90), rgba(28, 30, 40, 0.94));
+      border-color: rgba(196, 205, 223, 0.24);
+    }}
+
+    .wb-stage__event--ranking {{
+      background: linear-gradient(180deg, rgba(90, 68, 22, 0.90), rgba(52, 38, 12, 0.94));
+      border-color: rgba(255, 218, 132, 0.30);
     }}
 
     .wb-stage__hp {{
@@ -1872,10 +2990,9 @@ class DetailOverlayWriter:
     .wb-stage__hp-fill {{
       height: 100%;
       border-radius: inherit;
-      background:
-        linear-gradient(90deg, #f9735c, #ffb357 52%, #ffe27f);
+      background: linear-gradient(90deg, var(--wb-bar-a), var(--wb-bar-b) 52%, var(--wb-bar-c));
       box-shadow:
-        0 0 18px rgba(255, 164, 91, 0.42),
+        0 0 18px var(--wb-panel-glow),
         inset 0 1px 0 rgba(255, 255, 255, 0.24);
     }}
 
@@ -1952,6 +3069,67 @@ class DetailOverlayWriter:
       animation-duration: 4.2s;
     }}
 
+    .wb-stage--impacting .wb-stage__impact {{
+      animation: wb-impact-flash 1.4s cubic-bezier(0.18, 0.88, 0.22, 1.0) infinite;
+    }}
+
+    .wb-stage--phase-2 .wb-stage__panel {{
+      box-shadow:
+        0 30px 80px rgba(12, 10, 24, 0.28),
+        0 0 46px var(--wb-panel-glow),
+        inset 0 1px 0 rgba(255, 255, 255, 0.26);
+    }}
+
+    .wb-stage--phase-3 .wb-stage__backdrop {{
+      filter: blur(38px);
+      opacity: 0.9;
+    }}
+
+    .wb-stage--last-stand .wb-stage__panel {{
+      border-color: rgba(255, 214, 170, 0.34);
+      box-shadow:
+        0 30px 80px rgba(36, 8, 18, 0.34),
+        0 0 58px rgba(255, 122, 76, 0.18),
+        inset 0 0 0 1px rgba(255, 214, 170, 0.10);
+    }}
+
+    .wb-stage--last-stand .wb-stage__phase {{
+      letter-spacing: 0.22em;
+    }}
+
+    .wb-stage--race-focus .wb-stage__status {{
+      border-color: rgba(255, 221, 154, 0.28);
+      box-shadow:
+        0 24px 54px rgba(12, 10, 24, 0.22),
+        0 0 0 1px rgba(255, 221, 154, 0.08),
+        inset 0 1px 0 rgba(255, 250, 224, 0.14);
+    }}
+
+    .wb-stage--aoe .wb-stage__impact {{
+      animation: wb-impact-aoe 1.8s cubic-bezier(0.2, 0.88, 0.24, 1.0) infinite;
+    }}
+
+    .wb-stage--critical .wb-stage__event,
+    .wb-stage--victory-flash .wb-stage__event,
+    .wb-stage--timeout-flash .wb-stage__event,
+    .wb-stage--enrage-flash .wb-stage__event,
+    .wb-stage--recruiting-flash .wb-stage__event {{
+      animation: wb-banner-flash 1.05s ease-in-out infinite alternate;
+    }}
+
+    .wb-stage--downed .wb-stage__panel {{
+      box-shadow:
+        0 30px 80px rgba(42, 10, 24, 0.34),
+        inset 0 1px 0 rgba(255, 215, 193, 0.14);
+    }}
+
+    .wb-stage--recover .wb-stage__panel {{
+      border-color: rgba(170, 244, 210, 0.26);
+      box-shadow:
+        0 30px 80px rgba(10, 32, 24, 0.26),
+        inset 0 1px 0 rgba(210, 255, 233, 0.14);
+    }}
+
     .wb-stage--enrage .wb-stage__backdrop {{
       background:
         radial-gradient(circle at 50% 18%, rgba(255, 146, 120, 0.56), transparent 36%),
@@ -1985,6 +3163,10 @@ class DetailOverlayWriter:
     .wb-stage--timeout .wb-stage__pose {{
       animation: wb-timeout 6.2s cubic-bezier(0.38, 0.06, 0.3, 0.98) infinite;
       animation-delay: var(--wb-delay-timeout);
+    }}
+
+    .wb-stage--timeout .wb-stage__hud {{
+      border-color: rgba(190, 198, 218, 0.22);
     }}
 
     .wb-stage--danger .wb-stage__panel {{
@@ -2024,6 +3206,13 @@ class DetailOverlayWriter:
       62% {{ opacity: 0.08; transform: translate3d(-50%, -4px, 0) scale(1.22); }}
     }}
 
+    @keyframes wb-impact-aoe {{
+      0%, 18%, 100% {{ opacity: 0; transform: translate3d(-50%, 0, 0) scale(0.54); }}
+      34% {{ opacity: 0.18; transform: translate3d(-50%, -6px, 0) scale(0.96); }}
+      50% {{ opacity: 0.32; transform: translate3d(-50%, -10px, 0) scale(1.32); }}
+      72% {{ opacity: 0.04; transform: translate3d(-50%, -6px, 0) scale(1.58); }}
+    }}
+
     @keyframes wb-victory {{
       0%, 100% {{ transform: translate3d(0, 0, 0) scale(1); }}
       22% {{ transform: translate3d(0, -6px, 0) scale(1.01); }}
@@ -2056,6 +3245,11 @@ class DetailOverlayWriter:
       0%, 100% {{ transform: translate3d(-50%, 0, 0) scaleX(1) scaleY(1); opacity: 0.34; }}
       38% {{ transform: translate3d(-50%, 0, 0) scaleX(0.94) scaleY(0.9); opacity: 0.26; }}
       64% {{ transform: translate3d(-50%, 0, 0) scaleX(0.97) scaleY(0.94); opacity: 0.29; }}
+    }}
+
+    @keyframes wb-banner-flash {{
+      0% {{ transform: translate3d(0, 0, 0); box-shadow: 0 14px 32px rgba(8, 7, 14, 0.24); }}
+      100% {{ transform: translate3d(0, -2px, 0); box-shadow: 0 18px 40px rgba(255, 164, 91, 0.24); }}
     }}
 
     @media (max-width: 720px) {{

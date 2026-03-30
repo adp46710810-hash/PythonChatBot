@@ -93,20 +93,16 @@ class StreamBot(commands.Bot):
         "{boss_name} を沈めたぞ。普段よりはマシだったな",
     )
     _WORLD_BOSS_MVP_TTS_LINES = (
-        "MVPは {name}。他の雑魚は背中だけ見てろ",
-        "{name} がMVPだ。役立たずどもは見習え",
-        "MVP {name}。他の連中は爪の垢でも飲め",
+        "総合貢献王は {name}。他の雑魚は背中だけ見てろ",
+        "{name} が総合貢献王だ。役立たずどもは見習え",
+        "総合貢献王 {name}。他の連中は爪の垢でも飲め",
     )
     _WORLD_BOSS_TIMEOUT_TTS_LINES = (
         "{boss_name} は逃がした。ぬるい火力で何してた",
         "{boss_name} 時間切れ。雑魚火力の見本市だったな",
         "{boss_name} を取り逃がした。もたついた連中は反省会だ",
     )
-    _WORLD_BOSS_TOP_CONTRIBUTOR_TTS_LINES = (
-        "最多貢献は {name}。他は足を引っ張るな",
-        "{name} が一番働いてた。残りは置物か",
-        "最多貢献 {name}。役立たずどもは手数を見習え",
-    )
+    _WORLD_BOSS_TOP_CONTRIBUTOR_TTS_LINES = _WORLD_BOSS_MVP_TTS_LINES
 
     _DISCORD_WORLD_BOSS_BATTLE_LOGS_ENABLED = False
 
@@ -368,8 +364,11 @@ class StreamBot(commands.Bot):
         for entry in entries[:5]:
             rank = max(1, int(entry.get("rank", 0)))
             name = str(entry.get("display_name", "?") or "?").strip() or "?"
-            damage = max(0, int(entry.get("total_damage", 0)))
-            parts.append(f"#{rank} {name} {damage}")
+            contribution_score = max(
+                0,
+                int(entry.get("total_contribution_score", entry.get("contribution_score", 0)) or 0),
+            )
+            parts.append(f"#{rank} {name} 貢献{contribution_score}")
         return " / ".join(parts)
 
     def _build_world_boss_visual_overlay(self) -> tuple[str, List[str], str]:
@@ -380,14 +379,49 @@ class StreamBot(commands.Bot):
         boss_title = str(boss.get("title", "") or "").strip()
         participants = max(0, int(status.get("participants", 0) or 0))
         ranking_text = self._build_world_boss_ranking_summary(status.get("ranking", []))
+        boss_id = str(status.get("boss_id", "") or "").strip()
+        phase_id = str(status.get("phase_id", "") or "").strip()
+        phase_label = str(status.get("phase_label", "") or "").strip()
+        event_text = str(status.get("event_text", "") or "").strip()
+        event_kind = str(status.get("event_kind", "") or "").strip()
+        leader_name = str(status.get("leader_name", "") or "").strip()
+        leader_score = max(0, int(status.get("leader_score", 0) or 0))
+        runner_up_name = str(status.get("runner_up_name", "") or "").strip()
+        runner_up_score = max(0, int(status.get("runner_up_score", 0) or 0))
+        leader_gap = max(0, int(status.get("leader_gap", 0) or 0))
+        race_focus_active = bool(status.get("race_focus_active", False))
         recent_logs = [
             str(line).strip()
             for line in status.get("recent_logs", [])
             if str(line).strip()
         ]
+        race_text = ""
+        if leader_name and race_focus_active:
+            race_text = f"#1 {leader_name} {leader_score}"
+            if runner_up_name:
+                race_text += f" / #2 {runner_up_name} {runner_up_score} / 差 {leader_gap}"
 
         title = f"ワールドボス / {boss_name}"
         lines = ["section: ワールドボス"]
+        lines.extend(
+            [
+                f"meta: wb_phase | {phase}",
+                f"meta: wb_phase_id | {phase_id}",
+                f"meta: wb_boss_id | {boss_id}",
+                f"meta: wb_event_kind | {event_kind}",
+                f"meta: wb_show_stage | {1 if phase in {'recruiting', 'active'} else 0}",
+            ]
+        )
+        if participants:
+            lines.append(f"meta: wb_participants_text | {participants}人")
+        if ranking_text:
+            lines.append(f"meta: wb_ranking_text | {ranking_text}")
+        if event_text:
+            lines.append(f"meta: wb_event_text | {event_text}")
+        if race_focus_active:
+            lines.append("meta: wb_race_focus_active | 1")
+        if race_text:
+            lines.append(f"meta: wb_race_text | {race_text}")
 
         if phase == "recruiting":
             remain = max(0, int(float(status.get("join_ends_at", 0.0) or 0.0) - now_ts()))
@@ -427,6 +461,12 @@ class StreamBot(commands.Bot):
         else:
             lines.append("kv: 状態 | 待機中")
 
+        if phase_label:
+            lines.append(f"kv: フェーズ | {phase_label}")
+        if event_text:
+            lines.append(f"kv: イベント | {event_text}")
+        if race_text:
+            lines.append(f"kv: 総合貢献王争い | {race_text}")
         if phase in {"recruiting", "active"} and ranking_text:
             lines.append(f"kv: 順位 | {ranking_text}")
         if phase in {"recruiting", "active"} and recent_logs:
@@ -930,9 +970,10 @@ class StreamBot(commands.Bot):
                 StreamBot._WORLD_BOSS_TIMEOUT_TTS_LINES,
                 boss_name=boss_name,
             )
-        if safe_message.startswith("MVP "):
+        if safe_message.startswith("総合貢献王 ") or safe_message.startswith("MVP "):
+            prefix = "総合貢献王 " if safe_message.startswith("総合貢献王 ") else "MVP "
             actor_name = (
-                StreamBot._extract_world_boss_actor_name_for_tts(self, safe_message, "MVP ")
+                StreamBot._extract_world_boss_actor_name_for_tts(self, safe_message, prefix)
                 or "誰か"
             )
             return StreamBot._choose_world_boss_tts_line(

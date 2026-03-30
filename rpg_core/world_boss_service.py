@@ -21,10 +21,14 @@ WORLD_BOSS_AUTO_SPAWN_TIER_CHANCE_STEP = 0.02
 WORLD_BOSS_AUTO_SPAWN_CLEAR_CHANCE_STEP = 0.03
 WORLD_BOSS_AUTO_SPAWN_CLEAR_CHANCE_CAP = 0.18
 WORLD_BOSS_AUTO_SPAWN_CHANCE_CAP = 0.50
-WORLD_BOSS_JOIN_SEC_DEFAULT = 120
+WORLD_BOSS_JOIN_SEC_DEFAULT = 60
+WORLD_BOSS_DURATION_SEC_DEFAULT = 180
 WORLD_BOSS_HP_SCALE_LOG2_STEP = 0.90
 WORLD_BOSS_SUMMON_MATERIAL_COST = 48
 WORLD_BOSS_SUMMON_MATERIAL_PRIORITY = ("weapon", "armor", "ring", "shoes")
+WORLD_BOSS_MAJOR_PHASE_THRESHOLDS = {75: ("phase_2", "PHASE 2"), 25: ("last_stand", "LAST STAND")}
+WORLD_BOSS_OBJECTIVE_SCORE_CLEAR_BONUS = 5
+WORLD_BOSS_QUIET_VISUAL_EVENT_KINDS = {"join", "late_join"}
 
 
 class WorldBossService:
@@ -48,6 +52,10 @@ class WorldBossService:
     def _build_idle_state(self) -> Dict[str, Any]:
         return {
             "phase": "idle",
+            "phase_id": "idle",
+            "phase_label": "",
+            "event_kind": "",
+            "event_text": "",
             "boss_id": "",
             "boss": {},
             "participants": {},
@@ -64,6 +72,14 @@ class WorldBossService:
             "aoe_thresholds_triggered": [],
             "enrage_announced": False,
             "cooldown_ends_at": 0.0,
+            "start_participants": 0,
+            "late_join_count": 0,
+            "late_join_open": False,
+            "leader_name": "",
+            "leader_score": 0,
+            "runner_up_name": "",
+            "runner_up_score": 0,
+            "leader_gap": 0,
             "recent_logs": [],
             "ranking": [],
             "last_result": {},
@@ -197,11 +213,26 @@ class WorldBossService:
             participant.get("display_name", self.user_service.get_display_name(safe_username, safe_username)) or ""
         ).strip() or safe_username
         safe_title_label = str(participant.get("title_label", "") or "").strip()
+        active_ticks = max(0, int(participant.get("active_ticks", 0) or 0))
+        total_damage = max(0, int(participant.get("total_damage", 0) or 0))
+        legacy_contribution_score = max(0, int(participant.get("contribution_score", 0) or 0))
+        contribution = self._sanitize_contribution_breakdown(
+            participant.get("contribution", {}),
+            legacy_total=legacy_contribution_score,
+            active_ticks=active_ticks,
+            total_damage=total_damage,
+        )
+        total_contribution_score = max(
+            legacy_contribution_score,
+            max(0, int(participant.get("total_contribution_score", 0) or 0)),
+            self._sum_contribution_breakdown(contribution),
+        )
         return {
             "username": safe_username,
             "display_name": safe_display_name,
             "title_label": safe_title_label,
             "joined_at": float(participant.get("joined_at", 0.0) or 0.0),
+            "join_phase": str(participant.get("join_phase", "") or "").strip(),
             "snapshot_atk": max(1, int(participant.get("snapshot_atk", 1) or 1)),
             "snapshot_def": max(0, int(participant.get("snapshot_def", 0) or 0)),
             "snapshot_speed": max(1, int(participant.get("snapshot_speed", 100) or 100)),
@@ -242,9 +273,11 @@ class WorldBossService:
             "current_hp": max(0, int(participant.get("current_hp", 0) or 0)),
             "alive": bool(participant.get("alive", False)),
             "respawn_at": float(participant.get("respawn_at", 0.0) or 0.0),
-            "total_damage": max(0, int(participant.get("total_damage", 0) or 0)),
-            "active_ticks": max(0, int(participant.get("active_ticks", 0) or 0)),
-            "contribution_score": max(0, int(participant.get("contribution_score", 0) or 0)),
+            "total_damage": total_damage,
+            "active_ticks": active_ticks,
+            "contribution": contribution,
+            "total_contribution_score": total_contribution_score,
+            "contribution_score": total_contribution_score,
             "times_downed": max(0, int(participant.get("times_downed", 0) or 0)),
             "last_damage": max(0, int(participant.get("last_damage", 0) or 0)),
             "last_critical": bool(participant.get("last_critical", False)),
@@ -302,12 +335,24 @@ class WorldBossService:
             )
         state["participants"] = sanitized_participants
 
-        for key in ("current_hp", "max_hp", "tick_index", "boss_action_gauge"):
+        for key in (
+            "current_hp",
+            "max_hp",
+            "tick_index",
+            "boss_action_gauge",
+            "start_participants",
+            "late_join_count",
+            "leader_score",
+            "runner_up_score",
+            "leader_gap",
+        ):
             state[key] = max(0, int(state.get(key, 0) or 0))
         for key in ("started_at", "join_ends_at", "ends_at", "last_tick_at", "cooldown_ends_at"):
             state[key] = float(state.get(key, 0.0) or 0.0)
-        for key in ("join_warning_sent", "battle_warning_sent", "enrage_announced"):
+        for key in ("join_warning_sent", "battle_warning_sent", "enrage_announced", "late_join_open"):
             state[key] = bool(state.get(key, False))
+        for key in ("phase_id", "phase_label", "event_kind", "event_text", "leader_name", "runner_up_name"):
+            state[key] = str(state.get(key, "") or "").strip()
 
         thresholds = state.get("aoe_thresholds_triggered")
         if not isinstance(thresholds, list):
@@ -343,6 +388,7 @@ class WorldBossService:
             for line in pending_announcements
             if str(line).strip()
         ][-WORLD_BOSS_PENDING_ANNOUNCEMENT_LIMIT:]
+        self._refresh_visual_state(state)
         return state
 
     def get_auto_spawn_progress(self) -> Dict[str, Any]:
@@ -522,7 +568,13 @@ class WorldBossService:
         state["pending_announcements"] = []
         return messages
 
-    def _build_participant_snapshot(self, username: str, *, joined_at: float) -> Dict[str, Any]:
+    def _build_participant_snapshot(
+        self,
+        username: str,
+        *,
+        joined_at: float,
+        join_phase: str = "recruiting",
+    ) -> Dict[str, Any]:
         user = self.user_service.get_user(username)
         display_name = self.user_service.get_display_name(username, username)
         title_label = self.user_service.get_active_title_label(user)
@@ -534,6 +586,7 @@ class WorldBossService:
             "display_name": display_name,
             "title_label": title_label,
             "joined_at": joined_at,
+            "join_phase": str(join_phase or "recruiting").strip(),
             "snapshot_atk": int(player_stats.get("atk", 1)),
             "snapshot_def": int(player_stats.get("def", 0)),
             "snapshot_speed": int(player_stats.get("speed", 100)),
@@ -547,6 +600,8 @@ class WorldBossService:
             "respawn_at": 0.0,
             "total_damage": 0,
             "active_ticks": 0,
+            "contribution": self._sanitize_contribution_breakdown({}),
+            "total_contribution_score": 0,
             "contribution_score": 0,
             "times_downed": 0,
             "last_damage": 0,
@@ -566,6 +621,229 @@ class WorldBossService:
             )
         )
         return max(int(base_hp), scaled)
+
+    def _sanitize_contribution_breakdown(
+        self,
+        contribution: Any,
+        *,
+        legacy_total: int = 0,
+        active_ticks: int = 0,
+        total_damage: int = 0,
+    ) -> Dict[str, int]:
+        raw_contribution = contribution if isinstance(contribution, dict) else {}
+        breakdown = {
+            "damage_score": max(0, int(raw_contribution.get("damage_score", 0) or 0)),
+            "support_score": max(0, int(raw_contribution.get("support_score", 0) or 0)),
+            "survival_score": max(0, int(raw_contribution.get("survival_score", 0) or 0)),
+            "objective_score": max(0, int(raw_contribution.get("objective_score", 0) or 0)),
+        }
+        if self._sum_contribution_breakdown(breakdown) <= 0 and legacy_total > 0:
+            guessed_survival = max(0, int(active_ticks))
+            guessed_damage = max(0, legacy_total - guessed_survival)
+            if total_damage > 0:
+                guessed_damage = max(guessed_damage, int(total_damage))
+            breakdown["damage_score"] = guessed_damage
+            breakdown["survival_score"] = guessed_survival
+        return breakdown
+
+    def _sum_contribution_breakdown(self, contribution: Dict[str, int]) -> int:
+        return sum(
+            max(0, int(contribution.get(key, 0) or 0))
+            for key in ("damage_score", "support_score", "survival_score", "objective_score")
+        )
+
+    def _sync_participant_contribution(self, participant: Dict[str, Any]) -> None:
+        contribution = self._sanitize_contribution_breakdown(
+            participant.get("contribution", {}),
+            legacy_total=max(0, int(participant.get("contribution_score", 0) or 0)),
+            active_ticks=max(0, int(participant.get("active_ticks", 0) or 0)),
+            total_damage=max(0, int(participant.get("total_damage", 0) or 0)),
+        )
+        total_contribution_score = self._sum_contribution_breakdown(contribution)
+        participant["contribution"] = contribution
+        participant["total_contribution_score"] = total_contribution_score
+        participant["contribution_score"] = total_contribution_score
+
+    def _add_participant_contribution(
+        self,
+        participant: Dict[str, Any],
+        *,
+        damage: int = 0,
+        support: int = 0,
+        survival: int = 0,
+        objective: int = 0,
+    ) -> None:
+        contribution = self._sanitize_contribution_breakdown(
+            participant.get("contribution", {}),
+            legacy_total=max(0, int(participant.get("contribution_score", 0) or 0)),
+            active_ticks=max(0, int(participant.get("active_ticks", 0) or 0)),
+            total_damage=max(0, int(participant.get("total_damage", 0) or 0)),
+        )
+        contribution["damage_score"] = max(0, int(contribution.get("damage_score", 0) or 0)) + max(0, int(damage))
+        contribution["support_score"] = max(0, int(contribution.get("support_score", 0) or 0)) + max(0, int(support))
+        contribution["survival_score"] = max(0, int(contribution.get("survival_score", 0) or 0)) + max(0, int(survival))
+        contribution["objective_score"] = max(0, int(contribution.get("objective_score", 0) or 0)) + max(0, int(objective))
+        participant["contribution"] = contribution
+        self._sync_participant_contribution(participant)
+
+    def _estimate_support_score_from_skill(self, skill: Optional[Dict[str, Any]]) -> int:
+        if not isinstance(skill, dict):
+            return 0
+        stats = normalize_stats(skill.get("stats", {}))
+        nonzero_stat_count = sum(
+            1 for key in ("atk", "def", "speed", "max_hp") if int(stats.get(key, 0) or 0) > 0
+        )
+        special_effect_count = len(
+            [
+                effect
+                for effect in self.battle_service._normalize_special_effects(skill.get("special_effects", []))
+                if isinstance(effect, dict)
+            ]
+        )
+        action_gauge_bonus = 1 if self.battle_service.get_skill_action_gauge_bonus(skill) > 0 else 0
+        raw_score = nonzero_stat_count + special_effect_count + action_gauge_bonus
+        return max(1, raw_score)
+
+    def _is_participant_reward_eligible(self, boss: Dict[str, Any], participant: Dict[str, Any]) -> bool:
+        min_ticks = max(1, int(boss.get("min_participation_ticks", 1)))
+        min_contribution = max(1, int(boss.get("min_contribution", 1)))
+        active_ticks = max(0, int(participant.get("active_ticks", 0) or 0))
+        contribution_score = max(
+            0,
+            int(participant.get("total_contribution_score", participant.get("contribution_score", 0)) or 0),
+        )
+        return active_ticks >= min_ticks and contribution_score >= min_contribution
+
+    def _get_objective_score_bonus(self, boss: Dict[str, Any], *, cleared: bool) -> int:
+        if not cleared:
+            return 0
+        raw_bonus = boss.get("objective_score_bonus")
+        if raw_bonus is not None:
+            try:
+                return max(0, int(raw_bonus))
+            except (TypeError, ValueError):
+                return WORLD_BOSS_OBJECTIVE_SCORE_CLEAR_BONUS
+        return WORLD_BOSS_OBJECTIVE_SCORE_CLEAR_BONUS
+
+    def _should_highlight_race(self, state: Dict[str, Any], *, now: Optional[float] = None) -> bool:
+        if str(state.get("phase", "idle") or "idle").strip() != "active":
+            return False
+        phase_id = str(state.get("phase_id", "") or "").strip()
+        if phase_id == "last_stand":
+            return True
+        if bool(state.get("battle_warning_sent", False)):
+            return True
+        return str(state.get("event_kind", "") or "").strip() == "last_call"
+
+    def _sanitize_visual_event_snapshot(self, state: Dict[str, Any]) -> Tuple[str, str]:
+        event_kind = str(state.get("event_kind", "") or "").strip()
+        event_text = str(state.get("event_text", "") or "").strip()
+        if event_kind in WORLD_BOSS_QUIET_VISUAL_EVENT_KINDS:
+            return "", ""
+        return event_kind, event_text
+
+    def _derive_phase_snapshot(self, state: Dict[str, Any]) -> Tuple[str, str]:
+        phase = str(state.get("phase", "idle") or "idle").strip()
+        if phase == "idle":
+            return "idle", ""
+        if phase == "recruiting":
+            return "entry_open", "ENTRY OPEN"
+        if phase == "cooldown":
+            last_result = state.get("last_result", {})
+            if isinstance(last_result, dict) and last_result:
+                if bool(last_result.get("cleared", False)):
+                    return "boss_down", "BOSS DOWN"
+                return "time_over", "TIME OVER"
+            return "cooldown", "COOLDOWN"
+
+        current_hp = max(0, int(state.get("current_hp", 0) or 0))
+        max_hp = max(1, int(state.get("max_hp", 1) or 1))
+        hp_pct = int(round((current_hp / max_hp) * 100)) if max_hp > 0 else 0
+        if hp_pct <= 25:
+            return "last_stand", "LAST STAND"
+        if hp_pct <= 75:
+            return "phase_2", "PHASE 2"
+        return "phase_1", "PHASE 1"
+
+    def _derive_event_snapshot(self, state: Dict[str, Any]) -> Tuple[str, str]:
+        candidates = [
+            *(str(line).strip() for line in reversed(state.get("recent_logs", [])) if str(line).strip()),
+        ]
+
+        last_result = state.get("last_result", {})
+        if isinstance(last_result, dict) and last_result:
+            boss_name = str(last_result.get("boss_name", "WB") or "WB").strip() or "WB"
+            if bool(last_result.get("cleared", False)):
+                candidates.append(f"討伐成功: {boss_name}")
+            else:
+                candidates.append(f"時間切れ: {boss_name}")
+
+        phase = str(state.get("phase", "idle") or "idle").strip()
+        if phase == "recruiting":
+            candidates.append("募集中")
+        elif phase == "active":
+            candidates.append("戦闘中")
+
+        for raw_line in candidates:
+            if not raw_line:
+                continue
+            if raw_line.startswith("WB全体攻撃:") or "怒りの全体攻撃" in raw_line:
+                return "aoe", raw_line
+            if raw_line.startswith("戦闘開始:"):
+                return "start", raw_line
+            if raw_line.startswith("WB激昂"):
+                return "enrage", raw_line
+            if raw_line.startswith("WB撃破:"):
+                return "down", raw_line
+            if raw_line.startswith("復帰:"):
+                return "recover", raw_line
+            if raw_line.startswith("討伐成功:"):
+                return "victory", raw_line
+            if raw_line.startswith("時間切れ:"):
+                return "timeout", raw_line
+            if raw_line.startswith("募集開始:") or raw_line == "募集中":
+                return "recruiting", raw_line
+            if raw_line.startswith("途中参加:"):
+                return "late_join", raw_line
+            if raw_line.startswith("参加:"):
+                return "join", raw_line
+            if raw_line.startswith("総合貢献王 "):
+                return "ranking", raw_line
+            if raw_line.startswith("WB攻撃:"):
+                return "attack", raw_line
+        return "", ""
+
+    def _refresh_visual_state(self, state: Dict[str, Any]) -> None:
+        phase_id, phase_label = self._derive_phase_snapshot(state)
+        state["phase_id"] = phase_id
+        state["phase_label"] = phase_label
+
+        event_kind = str(state.get("event_kind", "") or "").strip()
+        event_text = str(state.get("event_text", "") or "").strip()
+        if not event_kind or not event_text:
+            event_kind, event_text = self._derive_event_snapshot(state)
+        state["event_kind"] = event_kind
+        state["event_text"] = event_text
+        state["late_join_open"] = str(state.get("phase", "idle") or "idle").strip() in {"recruiting", "active"}
+
+        ranking = self._build_ranking(state.get("participants", {}))
+        leader = ranking[0] if ranking else {}
+        runner_up = ranking[1] if len(ranking) >= 2 else {}
+        leader_name = str(leader.get("display_name", "") or "").strip()
+        leader_score = max(
+            0,
+            int(leader.get("total_contribution_score", leader.get("contribution_score", 0)) or 0),
+        )
+        runner_up_name = str(runner_up.get("display_name", "") or "").strip()
+        runner_up_score = max(
+            0,
+            int(runner_up.get("total_contribution_score", runner_up.get("contribution_score", 0)) or 0),
+        )
+        state["leader_name"] = leader_name
+        state["leader_score"] = leader_score
+        state["runner_up_name"] = runner_up_name
+        state["runner_up_score"] = runner_up_score
+        state["leader_gap"] = max(0, leader_score - runner_up_score)
 
     def _set_idle(self, state: Dict[str, Any]) -> None:
         last_result = deepcopy(state.get("last_result", {}))
@@ -600,6 +878,9 @@ class WorldBossService:
         join_sec = max(1, int(boss.get("join_sec", WORLD_BOSS_JOIN_SEC_DEFAULT)))
         state["join_ends_at"] = start_at + join_sec
         self._push_recent_log(state, f"募集開始: {boss['name']}")
+        state["event_kind"] = "recruiting"
+        state["event_text"] = f"募集開始: {boss['name']}"
+        self._refresh_visual_state(state)
         message = (
             f"WB募集開始 / {boss['name']}"
             f" / {join_sec}秒"
@@ -761,9 +1042,18 @@ class WorldBossService:
         participants[safe_username] = self._build_participant_snapshot(
             safe_username,
             joined_at=joined_at,
+            join_phase=phase,
         )
         log_prefix = "参加" if phase == "recruiting" else "途中参加"
         self._push_recent_log(state, f"{log_prefix}: {participants[safe_username]['display_name']}")
+        if phase == "active":
+            state["late_join_count"] = max(0, int(state.get("late_join_count", 0) or 0)) + 1
+            state["event_kind"] = "late_join"
+            state["event_text"] = f"途中参加: {participants[safe_username]['display_name']}"
+        else:
+            state["event_kind"] = "join"
+            state["event_text"] = f"参加: {participants[safe_username]['display_name']}"
+        self._refresh_visual_state(state)
         count = len(participants)
         join_notes: List[str] = []
         if join_unlocks.get("new_achievements"):
@@ -787,6 +1077,9 @@ class WorldBossService:
             return False, "はWBへ参加していません。"
 
         self._push_recent_log(state, f"離脱: {participant.get('display_name', safe_username)}")
+        state["event_kind"] = "leave"
+        state["event_text"] = f"離脱: {participant.get('display_name', safe_username)}"
+        self._refresh_visual_state(state)
         return True, "はWB参加を取り消しました。"
 
     def _build_ranking(self, participants: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -798,7 +1091,13 @@ class WorldBossService:
                     str(participant.get("username", "") or "").strip()
                 )
                 else 0,
-                -int(participant.get("contribution_score", 0)),
+                -int(
+                    participant.get(
+                        "total_contribution_score",
+                        participant.get("contribution_score", 0),
+                    )
+                    or 0
+                ),
                 -int(participant.get("total_damage", 0)),
                 float(participant.get("joined_at", 0.0)),
                 str(participant.get("display_name", "")),
@@ -813,9 +1112,33 @@ class WorldBossService:
                     "display_name": str(participant.get("display_name", "") or "").strip(),
                     "title_label": str(participant.get("title_label", "") or "").strip(),
                     "total_damage": max(0, int(participant.get("total_damage", 0) or 0)),
+                    "contribution": deepcopy(
+                        self._sanitize_contribution_breakdown(
+                            participant.get("contribution", {}),
+                            legacy_total=max(0, int(participant.get("contribution_score", 0) or 0)),
+                            active_ticks=max(0, int(participant.get("active_ticks", 0) or 0)),
+                            total_damage=max(0, int(participant.get("total_damage", 0) or 0)),
+                        )
+                    ),
+                    "total_contribution_score": max(
+                        0,
+                        int(
+                            participant.get(
+                                "total_contribution_score",
+                                participant.get("contribution_score", 0),
+                            )
+                            or 0
+                        ),
+                    ),
                     "contribution_score": max(
                         0,
-                        int(participant.get("contribution_score", 0) or 0),
+                        int(
+                            participant.get(
+                                "total_contribution_score",
+                                participant.get("contribution_score", 0),
+                            )
+                            or 0
+                        ),
                     ),
                     "active_ticks": max(0, int(participant.get("active_ticks", 0) or 0)),
                     "times_downed": max(0, int(participant.get("times_downed", 0) or 0)),
@@ -831,7 +1154,7 @@ class WorldBossService:
 
         state["phase"] = "active"
         state["started_at"] = now
-        state["ends_at"] = now + max(1, int(boss.get("duration_sec", 120)))
+        state["ends_at"] = now + max(1, int(boss.get("duration_sec", WORLD_BOSS_DURATION_SEC_DEFAULT)))
         state["last_tick_at"] = now
         state["tick_index"] = 0
         state["current_hp"] = max_hp
@@ -840,6 +1163,9 @@ class WorldBossService:
         state["battle_warning_sent"] = False
         state["aoe_thresholds_triggered"] = []
         state["enrage_announced"] = False
+        state["start_participants"] = participant_count
+        state["late_join_count"] = 0
+        state["late_join_open"] = True
 
         activated_skills: List[str] = []
         for username, participant in participants.items():
@@ -866,6 +1192,9 @@ class WorldBossService:
         self._push_recent_log(state, f"戦闘開始: {boss.get('name', 'WB')} / HP {max_hp}")
         if activated_skills:
             self._push_recent_log(state, f"スキル発動: {' / '.join(activated_skills[:3])}")
+        state["event_kind"] = "start"
+        state["event_text"] = f"戦闘開始: {boss.get('name', 'WB')} / HP {max_hp}"
+        self._refresh_visual_state(state)
         return (
             f"WB開始 / {boss.get('name', 'WB')}"
             f" / HP {max_hp}"
@@ -936,7 +1265,11 @@ class WorldBossService:
             respawned_names.append(str(participant.get("display_name", "?") or "?").strip() or "?")
 
         if respawned_names:
-            self._push_recent_log(state, f"復帰: {' / '.join(respawned_names[:3])}")
+            recover_text = f"復帰: {' / '.join(respawned_names[:3])}"
+            self._push_recent_log(state, recover_text)
+            state["event_kind"] = "recover"
+            state["event_text"] = recover_text
+            self._refresh_visual_state(state)
 
     def _get_alive_participants(self, state: Dict[str, Any]) -> List[Dict[str, Any]]:
         return [
@@ -987,13 +1320,14 @@ class WorldBossService:
             if skill_effect and self.battle_service.skill_has_special_effect(selected_skill, "action_gauge_regen"):
                 skill_action_gauge_bonus = 0
             if selected_skill and skill_effect:
+                support_score = self._estimate_support_score_from_skill(selected_skill)
                 activated_skills.append(
                     f"{str(participant.get('display_name', '?') or '?').strip() or '?'}:{selected_skill.get('name', 'スキル')}"
                 )
                 participant["last_damage"] = 0
                 participant["last_critical"] = False
                 participant["active_ticks"] = max(0, int(participant.get("active_ticks", 0))) + 1
-                participant["contribution_score"] = max(0, int(participant.get("contribution_score", 0))) + 1
+                self._add_participant_contribution(participant, support=support_score, survival=1)
                 self.battle_service.finalize_unit_action(
                     participant,
                     used_skill=selected_skill,
@@ -1004,13 +1338,14 @@ class WorldBossService:
                 ready_participants = self.battle_service.get_ready_units(alive_participants)
                 continue
             if selected_skill and not skill_deals_damage:
+                support_score = self._estimate_support_score_from_skill(selected_skill)
                 activated_skills.append(
                     f"{str(participant.get('display_name', '?') or '?').strip() or '?'}:{selected_skill.get('name', 'スキル')}"
                 )
                 participant["last_damage"] = 0
                 participant["last_critical"] = False
                 participant["active_ticks"] = max(0, int(participant.get("active_ticks", 0))) + 1
-                participant["contribution_score"] = max(0, int(participant.get("contribution_score", 0))) + 1
+                self._add_participant_contribution(participant, support=support_score, survival=1)
                 self.battle_service.finalize_unit_action(
                     participant,
                     used_skill=selected_skill,
@@ -1051,10 +1386,10 @@ class WorldBossService:
             participant["last_critical"] = bool(is_critical)
             participant["total_damage"] = max(0, int(participant.get("total_damage", 0))) + max(1, int(damage))
             participant["active_ticks"] = max(0, int(participant.get("active_ticks", 0))) + 1
-            participant["contribution_score"] = (
-                max(0, int(participant.get("contribution_score", 0)))
-                + max(1, int(damage))
-                + 1
+            self._add_participant_contribution(
+                participant,
+                damage=max(1, int(damage)),
+                survival=1,
             )
             total_damage += max(1, int(damage))
             if is_critical:
@@ -1086,6 +1421,7 @@ class WorldBossService:
                 state,
                 f"T{int(state.get('tick_index', 0))}: {action_count}行動で{total_damage}ダメ",
             )
+        self._refresh_visual_state(state)
 
     def _run_threshold_aoe(self, state: Dict[str, Any], *, threshold: int, now: float) -> str:
         boss = state.get("boss", {})
@@ -1119,7 +1455,18 @@ class WorldBossService:
             state,
             log_line,
         )
-        return f"WB HP{threshold}%突破 / 怒りの全体攻撃"
+        if threshold in WORLD_BOSS_MAJOR_PHASE_THRESHOLDS:
+            phase_id, phase_label = WORLD_BOSS_MAJOR_PHASE_THRESHOLDS[threshold]
+            state["phase_id"] = phase_id
+            state["phase_label"] = phase_label
+            state["event_kind"] = "aoe"
+            state["event_text"] = log_line
+            self._refresh_visual_state(state)
+            return f"WB HP{threshold}%突破 / {phase_label}"
+        state["event_kind"] = "aoe"
+        state["event_text"] = log_line
+        self._refresh_visual_state(state)
+        return ""
 
     def _run_single_target_attack(self, state: Dict[str, Any], *, now: float, enraged: bool) -> None:
         boss = state.get("boss", {})
@@ -1147,11 +1494,17 @@ class WorldBossService:
                 state,
                 f"WB撃破: {target_name} / {damage}ダメ / 復帰{respawn_sec}秒",
             )
+            state["event_kind"] = "down"
+            state["event_text"] = f"WB撃破: {target_name} / {damage}ダメ / 復帰{respawn_sec}秒"
+            self._refresh_visual_state(state)
             return
         self._push_recent_log(
             state,
             f"WB攻撃: {target_name} に {damage}ダメ",
         )
+        state["event_kind"] = "attack"
+        state["event_text"] = f"WB攻撃: {target_name} に {damage}ダメ"
+        self._refresh_visual_state(state)
 
     def _run_boss_phase(self, state: Dict[str, Any], *, now: float) -> List[str]:
         boss = state.get("boss", {})
@@ -1168,14 +1521,18 @@ class WorldBossService:
             if hp_pct > safe_threshold:
                 continue
             triggered.append(safe_threshold)
-            messages.append(self._run_threshold_aoe(state, threshold=safe_threshold, now=now))
+            threshold_message = self._run_threshold_aoe(state, threshold=safe_threshold, now=now)
+            if threshold_message:
+                messages.append(threshold_message)
             return messages
 
         enrage_threshold_pct = max(1, int(boss.get("enrage_threshold_pct", 20)))
         enraged = hp_pct <= enrage_threshold_pct
         if enraged and not bool(state.get("enrage_announced", False)):
             state["enrage_announced"] = True
-            messages.append(f"WB激昂 / {boss.get('name', 'WB')} の攻撃が激化")
+            state["event_kind"] = "enrage"
+            state["event_text"] = f"WB激昂 / {boss.get('name', 'WB')} の攻撃が激化"
+            self._refresh_visual_state(state)
 
         self._run_single_target_attack(state, now=now, enraged=enraged)
         return messages
@@ -1211,12 +1568,8 @@ class WorldBossService:
         cleared: bool,
     ) -> Dict[str, Any]:
         self._ensure_user_world_boss_data(user)
-        min_ticks = max(1, int(boss.get("min_participation_ticks", 1)))
-        min_contribution = max(1, int(boss.get("min_contribution", 1)))
         total_damage = max(0, int(participant.get("total_damage", 0)))
-        contribution_score = max(0, int(participant.get("contribution_score", 0)))
-        active_ticks = max(0, int(participant.get("active_ticks", 0)))
-        eligible = active_ticks >= min_ticks and contribution_score >= min_contribution
+        eligible = self._is_participant_reward_eligible(boss, participant)
 
         exp_reward = 0
         gold_reward = 0
@@ -1292,6 +1645,24 @@ class WorldBossService:
             "rank": max(1, int(rank)),
             "participant_count": max(1, int(rewards.get("participant_count", 1))),
             "total_damage": max(0, int(participant.get("total_damage", 0))),
+            "contribution": deepcopy(
+                self._sanitize_contribution_breakdown(
+                    participant.get("contribution", {}),
+                    legacy_total=max(0, int(participant.get("contribution_score", 0) or 0)),
+                    active_ticks=max(0, int(participant.get("active_ticks", 0) or 0)),
+                    total_damage=max(0, int(participant.get("total_damage", 0) or 0)),
+                )
+            ),
+            "total_contribution_score": max(
+                0,
+                int(
+                    participant.get(
+                        "total_contribution_score",
+                        participant.get("contribution_score", 0),
+                    )
+                    or 0
+                ),
+            ),
             "contribution_score": max(0, int(participant.get("contribution_score", 0))),
             "active_ticks": max(0, int(participant.get("active_ticks", 0))),
             "times_downed": max(0, int(participant.get("times_downed", 0))),
@@ -1314,6 +1685,14 @@ class WorldBossService:
     def _resolve_battle(self, state: Dict[str, Any], *, now: float, cleared: bool) -> List[str]:
         boss = deepcopy(state.get("boss", {}))
         participants = state.get("participants", {})
+        objective_score_bonus = self._get_objective_score_bonus(boss, cleared=cleared)
+        if objective_score_bonus > 0:
+            for participant in participants.values():
+                if not isinstance(participant, dict):
+                    continue
+                if not self._is_participant_reward_eligible(boss, participant):
+                    continue
+                self._add_participant_contribution(participant, objective=objective_score_bonus)
         ranking = self._build_ranking(participants)
         participant_count = len(ranking)
         total_damage = sum(int(entry.get("total_damage", 0)) for entry in ranking)
@@ -1368,6 +1747,7 @@ class WorldBossService:
         }
         state["phase"] = "cooldown"
         state["cooldown_ends_at"] = now + WORLD_BOSS_COOLDOWN_SEC
+        state["late_join_open"] = False
         self._push_recent_log(
             state,
             f"{'討伐成功' if cleared else '時間切れ'}: {boss.get('name', 'WB')}",
@@ -1376,11 +1756,18 @@ class WorldBossService:
         top_entry = ranking[0] if ranking else {}
         top_name = str(top_entry.get("display_name", "") or "").strip()
         top_damage = max(0, int(top_entry.get("total_damage", 0)))
+        top_score = max(
+            0,
+            int(top_entry.get("total_contribution_score", top_entry.get("contribution_score", 0)) or 0),
+        )
+        state["event_kind"] = "victory" if cleared else "timeout"
+        state["event_text"] = f"{'討伐成功' if cleared else '時間切れ'}: {boss.get('name', 'WB')}"
+        self._refresh_visual_state(state)
         if cleared:
             if top_name:
                 messages = [
                     f"WB討伐成功 / {boss.get('name', 'WB')}",
-                    f"MVP {top_name} / {top_damage}ダメ",
+                    f"総合貢献王 {top_name} / 貢献 {top_score} / {top_damage}ダメ",
                 ]
                 messages.extend(achievement_announcements[:1])
                 return messages
@@ -1390,7 +1777,7 @@ class WorldBossService:
         if top_name:
             messages = [
                 f"WB時間切れ / {boss.get('name', 'WB')}",
-                f"最多貢献 {top_name} / {top_damage}ダメ",
+                f"総合貢献王 {top_name} / 貢献 {top_score} / {top_damage}ダメ",
             ]
             messages.extend(achievement_announcements[:1])
             return messages
@@ -1432,6 +1819,9 @@ class WorldBossService:
                 and float(state.get("join_ends_at", 0.0)) - current_time <= 10.0
             ):
                 state["join_warning_sent"] = True
+                state["event_kind"] = "recruiting"
+                state["event_text"] = "開始まで残り10秒"
+                self._refresh_visual_state(state)
                 messages.append("WB開始まで残り10秒 / `!wb参加`")
                 changed = True
             if current_time >= float(state.get("join_ends_at", 0.0)):
@@ -1450,6 +1840,9 @@ class WorldBossService:
                 and float(state.get("ends_at", 0.0)) - current_time <= 30.0
             ):
                 state["battle_warning_sent"] = True
+                state["event_kind"] = "last_call"
+                state["event_text"] = "WB残り30秒"
+                self._refresh_visual_state(state)
                 messages.append("WB残り30秒")
                 changed = True
 
@@ -1506,9 +1899,15 @@ class WorldBossService:
                 if str(entry.get("username", "") or "").strip() == safe_username:
                     participant_entry["rank"] = int(entry.get("rank", 0))
                     break
+        event_kind, event_text = self._sanitize_visual_event_snapshot(state)
+        race_focus_active = self._should_highlight_race(state)
 
         return {
             "phase": str(state.get("phase", "idle") or "idle"),
+            "phase_id": str(state.get("phase_id", "") or "").strip(),
+            "phase_label": str(state.get("phase_label", "") or "").strip(),
+            "event_kind": event_kind,
+            "event_text": event_text,
             "boss_id": str(state.get("boss_id", "") or "").strip(),
             "boss": deepcopy(state.get("boss", {})),
             "current_hp": max(0, int(state.get("current_hp", 0) or 0)),
@@ -1517,6 +1916,15 @@ class WorldBossService:
             "started_at": float(state.get("started_at", 0.0) or 0.0),
             "ends_at": float(state.get("ends_at", 0.0) or 0.0),
             "cooldown_ends_at": float(state.get("cooldown_ends_at", 0.0) or 0.0),
+            "start_participants": max(0, int(state.get("start_participants", 0) or 0)),
+            "late_join_count": max(0, int(state.get("late_join_count", 0) or 0)),
+            "late_join_open": bool(state.get("late_join_open", False)),
+            "leader_name": str(state.get("leader_name", "") or "").strip(),
+            "leader_score": max(0, int(state.get("leader_score", 0) or 0)),
+            "runner_up_name": str(state.get("runner_up_name", "") or "").strip(),
+            "runner_up_score": max(0, int(state.get("runner_up_score", 0) or 0)),
+            "leader_gap": max(0, int(state.get("leader_gap", 0) or 0)),
+            "race_focus_active": race_focus_active,
             "participants": len(participants),
             "ranking": deepcopy(ranking[:5]),
             "recent_logs": list(state.get("recent_logs", [])),

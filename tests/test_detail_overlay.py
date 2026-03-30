@@ -28,6 +28,8 @@ class DetailOverlayWriterTests(unittest.TestCase):
         self.assertIn("obs_detail_overlay_wb_state.js", wb_shell_payload)
         self.assertNotIn("overlay-frame-a", wb_shell_payload)
         self.assertIn("wb-stage-art", wb_shell_payload)
+        self.assertIn("payload.phaseId", wb_shell_payload)
+        self.assertIn("payload.raceFocusActive", wb_shell_payload)
 
     def test_structured_overlay_lines_render_clean_text_and_html(self) -> None:
         writer = DetailOverlayWriter("unused.html", "unused.txt")
@@ -36,6 +38,7 @@ class DetailOverlayWriterTests(unittest.TestCase):
                 [
                     "section: 次の一手",
                     "kv: 要約 | 朝の森へ向かう",
+                    "meta: wb_phase | active",
                     "alert: kv: 状態 | 戦闘不能",
                     "通常行も残す",
                 ]
@@ -48,11 +51,13 @@ class DetailOverlayWriterTests(unittest.TestCase):
         self.assertIn("要約: 朝の森へ向かう", text_payload)
         self.assertIn("! 状態: 戦闘不能", text_payload)
         self.assertIn("通常行も残す", text_payload)
+        self.assertNotIn("wb_phase", text_payload)
 
         self.assertIn('class="section"', html_payload)
         self.assertIn('class="line line--kv"', html_payload)
         self.assertIn('class="line line--kv line--alert"', html_payload)
         self.assertIn("通常行も残す", html_payload)
+        self.assertNotIn("wb_phase", html_payload)
 
     def test_world_boss_overlay_renders_visual_panel_and_motion_classes(self) -> None:
         writer = DetailOverlayWriter("unused.html", "unused.txt")
@@ -66,7 +71,8 @@ class DetailOverlayWriterTests(unittest.TestCase):
                     "kv: HP | 480/1500 (32%)",
                     "section: 直近ログ",
                     "kv: 1 | 戦闘開始: 灼甲帝ヴァルカラン / HP 1500",
-                    "kv: 2 | WB攻撃: Alice に 34ダメ",
+                    "kv: 2 | WB激昂 / 灼甲帝ヴァルカラン",
+                    "kv: 3 | WB全体攻撃: Alice に 34ダメ",
                 ]
             )
         )
@@ -78,11 +84,18 @@ class DetailOverlayWriterTests(unittest.TestCase):
         self.assertIn("紅蓮を喰らう甲殻王", html_payload)
         self.assertIn("wb-stage--active", html_payload)
         self.assertIn("wb-stage--attack", html_payload)
+        self.assertIn("wb-stage--phase-3", html_payload)
+        self.assertIn("wb-stage--aoe", html_payload)
+        self.assertIn("wb-theme--crimson", html_payload)
         self.assertIn("wb-stage__hp-fill", html_payload)
         self.assertIn("wb-stage__motion", html_payload)
         self.assertIn("wb-stage__pose", html_payload)
         self.assertIn("wb-stage__shadow", html_payload)
         self.assertIn("wb-stage__impact", html_payload)
+        self.assertIn("wb-stage__phase", html_payload)
+        self.assertIn("PHASE 3", html_payload)
+        self.assertIn("wb-stage__event--aoe", html_payload)
+        self.assertIn("WB全体攻撃: Alice に 34ダメ", html_payload)
 
     def test_world_boss_idle_overlay_does_not_render_stage_panel(self) -> None:
         writer = DetailOverlayWriter("unused.html", "unused.txt")
@@ -153,7 +166,12 @@ class DetailOverlayWriterTests(unittest.TestCase):
 
         self.assertIn('class="overlay overlay--wb overlay--wb-full"', info_html_payload)
         self.assertNotIn('class="wb-stage', info_html_payload)
-        self.assertIn('class="wb-stage wb-stage--idle wb-stage--active wb-stage--visual-only"', wb_html_payload)
+        self.assertIn('class="wb-stage ', wb_html_payload)
+        self.assertIn("wb-stage--idle", wb_html_payload)
+        self.assertIn("wb-theme--crimson", wb_html_payload)
+        self.assertIn("wb-stage--active", wb_html_payload)
+        self.assertIn("wb-stage--phase-3", wb_html_payload)
+        self.assertIn("wb-stage--visual-only", wb_html_payload)
         self.assertNotIn('class="wb-stage__hud"', wb_html_payload)
         self.assertNotIn('class="overlay overlay--wb', wb_html_payload)
         self.assertIn('data-has-wb-stage="1"', wb_html_payload)
@@ -183,6 +201,7 @@ class DetailOverlayWriterTests(unittest.TestCase):
         html_payload = writer._render_html("Alice / !wb", "2026-03-24 12:00:00", entries)
 
         self.assertIn('src="2.png"', html_payload)
+        self.assertIn("wb-theme--moon", html_payload)
 
     def test_world_boss_overlay_uses_configured_visual_for_witch_style_boss(self) -> None:
         test_tmp_root = Path(__file__).resolve().parent
@@ -323,7 +342,108 @@ class DetailOverlayWriterTests(unittest.TestCase):
         self.assertIn("window.__WB_OVERLAY_STATE__", state_payload)
         self.assertIn("\"showStage\": true", state_payload)
         self.assertIn("\"bossName\": \"灼甲帝ヴァルカラン\"", state_payload)
-        self.assertIn("\"stageClasses\": [\"wb-stage--idle\", \"wb-stage--active\"]", state_payload)
+        self.assertIn("\"bossId\": \"crimson_beetle_emperor\"", state_payload)
+        self.assertIn("\"phaseLabel\": \"PHASE 3\"", state_payload)
+        self.assertIn("\"wb-theme--crimson\"", state_payload)
+        self.assertIn("\"wb-stage--active\"", state_payload)
+        self.assertIn("\"wb-stage--phase-3\"", state_payload)
+
+    def test_show_writes_world_boss_event_summary_into_state_payload(self) -> None:
+        test_tmp_root = Path(__file__).resolve().parent
+        output_dir = test_tmp_root / "tmp_detail_overlay_writer_state_event"
+        output_dir.mkdir(exist_ok=True)
+        html_path = output_dir / "obs_detail_overlay.html"
+        text_path = output_dir / "obs_detail_overlay.txt"
+        writer = DetailOverlayWriter(str(html_path), str(text_path))
+
+        writer.show_wb_html(
+            "ワールドボス / 月蝕機卿ネメシス",
+            [
+                "section: ワールドボス",
+                "kv: WB | 月蝕機卿ネメシス / 崩月廃都の監督者",
+                "kv: 状態 | 戦闘中 / 残り 41秒",
+                "kv: 参加人数 | 4人",
+                "kv: HP | 1200/2100 (57%)",
+                "section: 直近ログ",
+                "kv: 1 | 戦闘開始: 月蝕機卿ネメシス / HP 2100",
+                "kv: 2 | WB全体攻撃: Alice に 28ダメ",
+            ],
+        )
+
+        state_payload = (output_dir / "obs_detail_overlay_wb_state.js").read_text(encoding="utf-8")
+
+        self.assertIn("\"eventKind\": \"aoe\"", state_payload)
+        self.assertIn("\"eventText\": \"WB全体攻撃: Alice に 28ダメ\"", state_payload)
+        self.assertIn("\"bossId\": \"moon_ruin_overseer\"", state_payload)
+
+    def test_show_writes_world_boss_state_payload_prefers_meta_state_values(self) -> None:
+        test_tmp_root = Path(__file__).resolve().parent
+        output_dir = test_tmp_root / "tmp_detail_overlay_writer_state_meta"
+        output_dir.mkdir(exist_ok=True)
+        html_path = output_dir / "obs_detail_overlay.html"
+        text_path = output_dir / "obs_detail_overlay.txt"
+        writer = DetailOverlayWriter(str(html_path), str(text_path))
+
+        writer.show_wb_html(
+            "ワールドボス / 灼甲帝ヴァルカラン",
+            [
+                "section: ワールドボス",
+                "meta: wb_phase | active",
+                "meta: wb_phase_id | last_stand",
+                "meta: wb_boss_id | crimson_beetle_emperor",
+                "meta: wb_event_kind | ranking",
+                "meta: wb_event_text | 総合貢献王争い / #1 Alice 120 / #2 Bob 112 / 差 8",
+                "meta: wb_participants_text | 3人",
+                "meta: wb_ranking_text | #1 Alice 貢献120 / #2 Bob 貢献112",
+                "meta: wb_show_stage | 1",
+                "kv: WB | 灼甲帝ヴァルカラン / 紅蓮を喰らう甲殻王",
+                "kv: 状態 | 戦闘中 / 残り 22秒",
+                "kv: 参加人数 | 3人",
+                "kv: HP | 480/1500 (32%)",
+            ],
+        )
+
+        state_payload = (output_dir / "obs_detail_overlay_wb_state.js").read_text(encoding="utf-8")
+
+        self.assertIn("\"phase\": \"active\"", state_payload)
+        self.assertIn("\"phaseId\": \"last_stand\"", state_payload)
+        self.assertIn("\"phaseLabel\": \"LAST STAND\"", state_payload)
+        self.assertIn("\"eventKind\": \"ranking\"", state_payload)
+        self.assertIn("\"eventText\": \"総合貢献王争い / #1 Alice 120 / #2 Bob 112 / 差 8\"", state_payload)
+        self.assertIn("\"rankingText\": \"#1 Alice 貢献120 / #2 Bob 貢献112\"", state_payload)
+        self.assertIn("\"raceFocusActive\": false", state_payload)
+        self.assertIn("\"raceText\": \"\"", state_payload)
+
+    def test_show_writes_world_boss_race_focus_meta_into_state_payload(self) -> None:
+        test_tmp_root = Path(__file__).resolve().parent
+        output_dir = test_tmp_root / "tmp_detail_overlay_writer_state_race"
+        output_dir.mkdir(exist_ok=True)
+        html_path = output_dir / "obs_detail_overlay.html"
+        text_path = output_dir / "obs_detail_overlay.txt"
+        writer = DetailOverlayWriter(str(html_path), str(text_path))
+
+        writer.show_wb_html(
+            "ワールドボス / 灼甲帝ヴァルカラン",
+            [
+                "section: ワールドボス",
+                "meta: wb_phase | active",
+                "meta: wb_phase_id | last_stand",
+                "meta: wb_boss_id | crimson_beetle_emperor",
+                "meta: wb_race_focus_active | 1",
+                "meta: wb_race_text | #1 Alice 120 / #2 Bob 112 / 差 8",
+                "kv: WB | 灼甲帝ヴァルカラン / 紅蓮を喰らう甲殻王",
+                "kv: 状態 | 戦闘中 / 残り 22秒",
+                "kv: 参加人数 | 3人",
+                "kv: HP | 480/1500 (32%)",
+            ],
+        )
+
+        state_payload = (output_dir / "obs_detail_overlay_wb_state.js").read_text(encoding="utf-8")
+        wb_content = (output_dir / "obs_detail_overlay_wb_content.html").read_text(encoding="utf-8")
+
+        self.assertIn("\"raceFocusActive\": true", state_payload)
+        self.assertIn("\"raceText\": \"#1 Alice 120 / #2 Bob 112 / 差 8\"", state_payload)
+        self.assertIn("wb-stage--race-focus", wb_content)
 
     def test_show_keeps_existing_wb_html_when_non_world_boss_overlay_updates(self) -> None:
         test_tmp_root = Path(__file__).resolve().parent
@@ -356,7 +476,10 @@ class DetailOverlayWriterTests(unittest.TestCase):
         wb_content_after = wb_content_path.read_text(encoding="utf-8")
 
         self.assertEqual(wb_content_before, wb_content_after)
-        self.assertIn('class="wb-stage wb-stage--idle wb-stage--active wb-stage--visual-only"', wb_content_after)
+        self.assertIn('class="wb-stage ', wb_content_after)
+        self.assertIn("wb-stage--idle", wb_content_after)
+        self.assertIn("wb-stage--active", wb_content_after)
+        self.assertIn("wb-stage--visual-only", wb_content_after)
 
     def test_show_can_skip_world_boss_variant_rewrite_for_spawn_card(self) -> None:
         test_tmp_root = Path(__file__).resolve().parent

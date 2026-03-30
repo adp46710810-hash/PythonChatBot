@@ -12,5 +12,8 @@ botdata.json
 data/runtime/
 バックアップ/
 
+# Documentation (Note articles, etc.)
+docs/
+
 # Tooling output
 layerdivider/output/
