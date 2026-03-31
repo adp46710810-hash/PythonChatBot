@@ -175,7 +175,7 @@ git submodule update --init --recursive
 - `!探索 結果` では探索全体の要約を表示し、ターンごとの戦闘ログは `!探索 戦闘` で OBS に出します。`!探索 戦闘 3` のように指定すると個別戦闘を表示でき、各ターンで敵HPと自分HPの推移を確認できます。
 - `!探索 戦闘` の最下行には、常に探索を切り上げた場所と理由が `撤退情報:` として表示されます。
 - Browser Source を使う場合は、統合表示なら `data/runtime/obs_detail_overlay.html`、情報だけなら `data/runtime/obs_detail_overlay_info.html`、WBビジュアルだけなら `data/runtime/obs_detail_overlay_wb.html` を読み込んでください。統合表示と情報表示は固定シェルが 2 秒ごとに中身だけ差し替えます。WBビジュアルだけは固定DOMのまま `state.js` を読み直す方式なので、立ち絵画像は定期更新で再読込されません。WBステージはWB不在時に描画されず、更新が約8秒止まった場合も自動で非表示になります。
-- WB画像は弱い順に `data/runtime/1.png` `data/runtime/2.png` `data/runtime/3.png` `data/runtime/4.png` を使います。対応は `1: 灼甲帝ヴァルカラン` `2: 月蝕機卿ネメシス` `3: 魔弾妃ヘクセミア` `4: 迅剣姫ラファエラ` です。該当画像が無い場合は既存の共通画像 `data/runtime/world_boss_visual.png` を使います。
+- WB画像は GitHub 公開用に `data/assets/world_boss/1.png` `data/assets/world_boss/2.png` `data/assets/world_boss/3.png` `data/assets/world_boss/4.png` を同梱しています。対応は `1: 灼甲帝ヴァルカラン` `2: 月蝕機卿ネメシス` `3: 魔弾妃ヘクセミア` `4: 迅剣姫ラファエラ` です。ランタイム HTML はまず同じフォルダの画像を探し、見つからなければ `../assets/world_boss/` を参照します。該当画像が無い場合は既存の共通画像 `world_boss_visual.png` を使います。
 - Browser Source の幅・高さを OBS 側で変えると、オーバーレイの横幅、縦の表示量、文字サイズ、余白がその範囲に合わせて自動調整されます。
 - Text Source を使う場合は `data/runtime/obs_detail_overlay.txt` をファイル読み込みしてください。
 - 探索完了後は、そのユーザーが次にチャット発言した時点でも探索結果を自動受け取りします。`!探索 結果` は手動受け取りしたい場合にも使えます。

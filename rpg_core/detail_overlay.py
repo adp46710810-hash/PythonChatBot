@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from html import escape
 import json
+import os
 from pathlib import Path
 import re
 from typing import Iterable, List
@@ -34,6 +35,9 @@ class WorldBossOverlayState:
     hp_current: int = 0
     hp_max: int = 0
     hp_pct: int = 0
+    time_remaining_sec: int = 0
+    time_total_sec: int = 0
+    time_critical: bool = False
     participants_text: str = ""
     ranking_text: str = ""
     recent_logs: List[str] = field(default_factory=list)
@@ -44,8 +48,16 @@ class WorldBossOverlayState:
     phase_label: str = ""
     event_text: str = ""
     event_kind: str = ""
+    event_classes: List[str] = field(default_factory=list)
+    presentation_trigger: str = ""
+    presentation_tone: str = ""
     race_focus_active: bool = False
     race_text: str = ""
+    leader_score: int = 0
+    runner_up_score: int = 0
+    leader_gap: int = 0
+    ranking_chip_text: str = ""
+    ranking_chip_classes: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -176,8 +188,9 @@ class DetailOverlayWriter:
         safe_title = escape(title)
         if variant == "wb":
             state_name = quote(Path(self._state_variant_path(variant)).name, safe="/:._-%")
+            info_content_name = quote(Path(self._content_html_path("info")).name, safe="/:._-%")
             return f"""<!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" class="wb-shell--stage-hidden">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -211,14 +224,65 @@ class DetailOverlayWriter:
       display: none !important;
     }}
 
-    .wb-stage-shell {{
+    .wb-shell-layout {{
       width: 100%;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(0, 620px) minmax(300px, 560px);
+      align-items: stretch;
+      justify-content: center;
+      gap: clamp(16px, 2vw, 26px);
+      padding: 0 clamp(10px, 1.4vw, 18px);
+      overflow: hidden;
+      background: transparent;
+    }}
+
+    .wb-stage-shell {{
       min-height: 100vh;
       display: flex;
       align-items: stretch;
       justify-content: center;
       overflow: hidden;
       background: transparent;
+    }}
+
+    .wb-info-host {{
+      position: relative;
+      min-height: 100vh;
+      height: 100vh;
+      overflow: hidden;
+      isolation: isolate;
+      justify-self: stretch;
+    }}
+
+    .wb-info-frame {{
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: transparent;
+      opacity: 0;
+      transition: opacity 90ms linear;
+      pointer-events: none;
+    }}
+
+    .wb-info-frame.is-visible {{
+      opacity: 1;
+    }}
+
+    html.wb-shell--stage-hidden .wb-shell-layout {{
+      grid-template-columns: minmax(0, 920px);
+      padding-inline: 0;
+    }}
+
+    html.wb-shell--stage-hidden .wb-stage-shell {{
+      display: none;
+    }}
+
+    html.wb-shell--stage-hidden .wb-info-host {{
+      width: min(100%, 960px);
+      justify-self: center;
     }}
 
     .wb-stage {{
@@ -420,7 +484,8 @@ class DetailOverlayWriter:
     }}
 
     .wb-stage__event--start,
-    .wb-stage__event--recruiting {{
+    .wb-stage__event--recruiting,
+    .wb-stage__event--announce {{
       background: linear-gradient(180deg, rgba(20, 68, 112, 0.84), rgba(14, 34, 62, 0.90));
       border-color: rgba(180, 224, 255, 0.28);
     }}
@@ -701,13 +766,31 @@ class DetailOverlayWriter:
         0 10px 24px rgba(255, 176, 82, 0.16);
     }}
 
-    .wb-stage__chip--race {{
-      background: linear-gradient(180deg, rgba(92, 68, 20, 0.92), rgba(54, 38, 12, 0.96));
-      border-color: rgba(255, 219, 138, 0.30);
-      color: #fff7e8;
+    .wb-stage__chip--result {{
+      background: linear-gradient(180deg, rgba(126, 92, 20, 0.94), rgba(72, 46, 10, 0.98));
+      border-color: rgba(255, 225, 150, 0.34);
+      color: #fff8e8;
       box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.12),
-        0 10px 24px rgba(255, 176, 82, 0.16);
+        inset 0 1px 0 rgba(255, 255, 255, 0.14),
+        0 12px 28px rgba(255, 195, 92, 0.18);
+    }}
+
+    .wb-stage--announce .wb-stage__panel {{
+      border-color: rgba(255, 230, 176, 0.26);
+      box-shadow:
+        0 30px 80px rgba(18, 12, 26, 0.30),
+        0 0 54px rgba(255, 214, 118, 0.18),
+        inset 0 0 0 1px rgba(255, 240, 208, 0.08);
+    }}
+
+    .wb-stage--announce .wb-stage__phase,
+    .wb-stage--announce .wb-stage__event {{
+      border-color: rgba(255, 229, 166, 0.34);
+      box-shadow: 0 16px 34px rgba(255, 196, 92, 0.16);
+    }}
+
+    .wb-stage--announce .wb-stage__motion {{
+      animation-duration: 6.6s;
     }}
 
     .wb-stage--recruiting .wb-stage__figure {{
@@ -730,6 +813,35 @@ class DetailOverlayWriter:
     .wb-stage--attack .wb-stage__impact,
     .wb-stage--impacting .wb-stage__impact {{
       animation: wb-impact-flash 2.6s cubic-bezier(0.18, 0.88, 0.22, 1.0) infinite;
+    }}
+
+    .wb-stage--boss-hit .wb-stage__pose {{
+      animation: wb-boss-hit-shudder 0.52s cubic-bezier(0.22, 0.78, 0.18, 1.0) 1;
+    }}
+
+    .wb-stage--boss-hit .wb-stage__backdrop {{
+      opacity: 0.96;
+      filter: blur(38px) saturate(1.08);
+    }}
+
+    .wb-stage--boss-hit .wb-stage__aura {{
+      opacity: 0.96;
+      transform: translate3d(0, 0, 0) scale(1.05);
+    }}
+
+    .wb-stage--boss-hit .wb-stage__impact {{
+      background:
+        radial-gradient(circle, rgba(255, 251, 236, 0.98) 0%, rgba(255, 224, 156, 0.62) 24%, rgba(255, 170, 92, 0.34) 46%, transparent 72%);
+      filter: blur(11px);
+      animation: wb-impact-flash 0.92s cubic-bezier(0.18, 0.88, 0.22, 1.0) 1;
+      opacity: 0.96;
+    }}
+
+    .wb-stage--boss-hit .wb-stage__panel {{
+      box-shadow:
+        0 30px 80px rgba(24, 12, 26, 0.32),
+        0 0 64px rgba(255, 214, 118, 0.22),
+        inset 0 0 0 1px rgba(255, 242, 204, 0.16);
     }}
 
     .wb-stage--phase-2 .wb-stage__panel {{
@@ -756,12 +868,100 @@ class DetailOverlayWriter:
       letter-spacing: 0.22em;
     }}
 
+    .wb-stage--resolving .wb-stage__panel {{
+      border-color: rgba(208, 214, 236, 0.26);
+      box-shadow:
+        0 30px 80px rgba(18, 14, 28, 0.28),
+        0 0 48px rgba(154, 170, 214, 0.14),
+        inset 0 0 0 1px rgba(244, 246, 255, 0.08);
+    }}
+
+    .wb-stage--resolving .wb-stage__event,
+    .wb-stage--resolving .wb-stage__phase {{
+      border-color: rgba(208, 214, 236, 0.30);
+      box-shadow: 0 16px 34px rgba(124, 138, 176, 0.14);
+    }}
+
+    .wb-stage--resolving .wb-stage__logbox {{
+      background: rgba(20, 18, 30, 0.50);
+      border-color: rgba(214, 220, 240, 0.20);
+    }}
+
     .wb-stage--race-focus .wb-stage__status {{
       border-color: rgba(255, 221, 154, 0.28);
       box-shadow:
         0 24px 54px rgba(12, 10, 24, 0.22),
         0 0 0 1px rgba(255, 221, 154, 0.08),
         inset 0 1px 0 rgba(255, 250, 224, 0.14);
+    }}
+
+    .wb-stage--time-critical .wb-stage__panel {{
+      box-shadow:
+        0 30px 80px rgba(40, 8, 18, 0.36),
+        0 0 62px rgba(255, 108, 90, 0.22),
+        inset 0 0 0 1px rgba(255, 196, 170, 0.14);
+    }}
+
+    .wb-stage--tone-warning .wb-stage__phase,
+    .wb-stage--tone-warning .wb-stage__event {{
+      border-color: rgba(255, 214, 140, 0.34);
+      box-shadow: 0 16px 34px rgba(255, 176, 84, 0.18);
+    }}
+
+    .wb-stage--tone-danger .wb-stage__event,
+    .wb-stage--tone-danger .wb-stage__phase {{
+      border-color: rgba(255, 168, 150, 0.36);
+      box-shadow: 0 16px 34px rgba(255, 104, 90, 0.20);
+    }}
+
+    .wb-stage--tone-spotlight .wb-stage__chip--race {{
+      border-color: rgba(255, 225, 154, 0.38);
+      box-shadow: 0 12px 28px rgba(255, 207, 102, 0.20);
+    }}
+
+    .wb-stage--trigger-boss-spawn .wb-stage__panel,
+    .wb-stage--trigger-battle-start .wb-stage__panel {{
+      box-shadow:
+        0 30px 80px rgba(18, 12, 26, 0.32),
+        0 0 58px rgba(255, 214, 118, 0.22),
+        inset 0 0 0 1px rgba(255, 238, 198, 0.14);
+    }}
+
+    .wb-stage--trigger-entry-open .wb-stage__panel {{
+      box-shadow:
+        0 30px 80px rgba(18, 12, 26, 0.30),
+        0 0 52px rgba(255, 223, 132, 0.18),
+        inset 0 0 0 1px rgba(255, 240, 208, 0.12);
+    }}
+
+    .wb-stage--trigger-entry-last-call .wb-stage__panel,
+    .wb-stage--trigger-finish-countdown .wb-stage__panel,
+    .wb-stage--trigger-last-stand-close-race .wb-stage__panel {{
+      box-shadow:
+        0 30px 80px rgba(32, 10, 22, 0.34),
+        0 0 60px rgba(255, 124, 88, 0.22),
+        inset 0 0 0 1px rgba(255, 214, 190, 0.14);
+    }}
+
+    .wb-stage--trigger-boss-spawn .wb-stage__event,
+    .wb-stage--trigger-battle-start .wb-stage__event,
+    .wb-stage--trigger-entry-open .wb-stage__event,
+    .wb-stage--trigger-entry-last-call .wb-stage__event,
+    .wb-stage--trigger-finish-countdown .wb-stage__event,
+    .wb-stage--trigger-last-stand-close-race .wb-stage__event {{
+      animation: wb-banner-flash 1.05s ease-in-out infinite alternate;
+    }}
+
+    .wb-stage--tone-victory .wb-stage__phase,
+    .wb-stage--tone-victory .wb-stage__event {{
+      border-color: rgba(255, 226, 146, 0.36);
+      box-shadow: 0 16px 34px rgba(255, 202, 84, 0.20);
+    }}
+
+    .wb-stage--tone-timeout .wb-stage__phase,
+    .wb-stage--tone-timeout .wb-stage__event {{
+      border-color: rgba(188, 200, 224, 0.28);
+      box-shadow: 0 16px 34px rgba(110, 124, 168, 0.16);
     }}
 
     .wb-stage--aoe .wb-stage__impact {{
@@ -837,6 +1037,14 @@ class DetailOverlayWriter:
       62% {{ opacity: 0.08; transform: translate3d(-50%, -4px, 0) scale(1.22); }}
     }}
 
+    @keyframes wb-boss-hit-shudder {{
+      0% {{ transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }}
+      18% {{ transform: translate3d(-1.6%, -0.8%, 0) rotate(-1.2deg) scale(1.01); }}
+      42% {{ transform: translate3d(2.4%, -1.4%, 0) rotate(1.8deg) scale(1.015); }}
+      68% {{ transform: translate3d(-1.1%, -0.3%, 0) rotate(-0.8deg) scale(1.005); }}
+      100% {{ transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }}
+    }}
+
     @keyframes wb-impact-aoe {{
       0%, 18%, 100% {{ opacity: 0; transform: translate3d(-50%, 0, 0) scale(0.54); }}
       34% {{ opacity: 0.18; transform: translate3d(-50%, -6px, 0) scale(0.96); }}
@@ -884,6 +1092,16 @@ class DetailOverlayWriter:
     }}
 
     @media (max-width: 720px) {{
+      .wb-shell-layout {{
+        grid-template-columns: minmax(0, 100%);
+        gap: 0;
+        padding-inline: 0;
+      }}
+
+      .wb-info-host {{
+        width: 100%;
+      }}
+
       .wb-stage {{
         width: min(100%, 100vw);
       }}
@@ -909,57 +1127,64 @@ class DetailOverlayWriter:
   </style>
 </head>
 <body>
-  <main class="wb-stage-shell" aria-label="{safe_title}">
-    <aside id="wb-stage" class="wb-stage is-hidden">
-      <div class="wb-stage__backdrop"></div>
-      <div class="wb-stage__panel">
-        <div class="wb-stage__signal">
-          <div id="wb-stage-phase-row" class="wb-stage__phase-row is-hidden">
-            <span id="wb-stage-phase" class="wb-stage__phase"></span>
+  <main class="wb-shell-layout" aria-label="{safe_title}">
+    <section class="wb-stage-shell">
+      <aside id="wb-stage" class="wb-stage is-hidden">
+        <div class="wb-stage__backdrop"></div>
+        <div class="wb-stage__panel">
+          <div class="wb-stage__signal">
+            <div id="wb-stage-phase-row" class="wb-stage__phase-row is-hidden">
+              <span id="wb-stage-phase" class="wb-stage__phase"></span>
+            </div>
+            <div id="wb-stage-event" class="wb-stage__event is-hidden"></div>
           </div>
-          <div id="wb-stage-event" class="wb-stage__event is-hidden"></div>
-        </div>
-        <div class="wb-stage__figure-wrap">
-          <div class="wb-stage__aura"></div>
-          <div class="wb-stage__impact"></div>
-          <div class="wb-stage__shadow"></div>
-          <div class="wb-stage__figure">
-            <div class="wb-stage__motion">
-              <div class="wb-stage__pose">
-                <img id="wb-stage-art" class="wb-stage__art is-hidden" alt="" loading="eager">
-                <div id="wb-stage-fallback" class="wb-stage__fallback is-hidden" aria-hidden="true">
-                  <span class="wb-stage__fallback-main">WB</span>
-                  <span class="wb-stage__fallback-sub">WORLD BOSS</span>
+          <div class="wb-stage__figure-wrap">
+            <div class="wb-stage__aura"></div>
+            <div class="wb-stage__impact"></div>
+            <div class="wb-stage__shadow"></div>
+            <div class="wb-stage__figure">
+              <div class="wb-stage__motion">
+                <div class="wb-stage__pose">
+                  <img id="wb-stage-art" class="wb-stage__art is-hidden" alt="" loading="eager">
+                  <div id="wb-stage-fallback" class="wb-stage__fallback is-hidden" aria-hidden="true">
+                    <span class="wb-stage__fallback-main">WB</span>
+                    <span class="wb-stage__fallback-sub">WORLD BOSS</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-        <div class="wb-stage__status">
-          <p class="wb-stage__eyebrow">WORLD BOSS</p>
-          <h1 id="wb-stage-name" class="wb-stage__name">WORLD BOSS</h1>
-          <p id="wb-stage-title" class="wb-stage__title is-hidden"></p>
-          <div id="wb-stage-hp" class="wb-stage__hp is-hidden">
-            <div class="wb-stage__hp-meta">
-              <span class="wb-stage__hp-label">HP</span>
-              <span id="wb-stage-hp-value" class="wb-stage__hp-value"></span>
+          <div class="wb-stage__status">
+            <p class="wb-stage__eyebrow">WORLD BOSS</p>
+            <h1 id="wb-stage-name" class="wb-stage__name">WORLD BOSS</h1>
+            <p id="wb-stage-title" class="wb-stage__title is-hidden"></p>
+            <div id="wb-stage-hp" class="wb-stage__hp is-hidden">
+              <div class="wb-stage__hp-meta">
+                <span class="wb-stage__hp-label">HP</span>
+                <span id="wb-stage-hp-value" class="wb-stage__hp-value"></span>
+              </div>
+              <div class="wb-stage__hp-track">
+                <div id="wb-stage-hp-fill" class="wb-stage__hp-fill"></div>
+              </div>
             </div>
-            <div class="wb-stage__hp-track">
-              <div id="wb-stage-hp-fill" class="wb-stage__hp-fill"></div>
+            <div class="wb-stage__chips">
+              <span id="wb-stage-status" class="wb-stage__chip is-hidden"></span>
+              <span id="wb-stage-participants" class="wb-stage__chip is-hidden"></span>
+              <span id="wb-stage-ranking" class="wb-stage__chip is-hidden"></span>
             </div>
           </div>
-          <div class="wb-stage__chips">
-            <span id="wb-stage-status" class="wb-stage__chip is-hidden"></span>
-            <span id="wb-stage-participants" class="wb-stage__chip is-hidden"></span>
-            <span id="wb-stage-ranking" class="wb-stage__chip is-hidden"></span>
-          </div>
         </div>
-      </div>
-    </aside>
+      </aside>
+    </section>
+    <section class="wb-info-host" aria-label="{safe_title} 詳細">
+      <iframe id="wb-info-frame-a" class="wb-info-frame is-visible" title="{safe_title} 詳細" loading="eager"></iframe>
+      <iframe id="wb-info-frame-b" class="wb-info-frame" title="{safe_title} 詳細" loading="eager"></iframe>
+    </section>
   </main>
   <script>
     (() => {{
       const stage = document.getElementById("wb-stage");
+      const root = document.documentElement;
       const art = document.getElementById("wb-stage-art");
       const fallback = document.getElementById("wb-stage-fallback");
       const phaseRow = document.getElementById("wb-stage-phase-row");
@@ -974,16 +1199,68 @@ class DetailOverlayWriter:
       const participantsChip = document.getElementById("wb-stage-participants");
       const rankingChip = document.getElementById("wb-stage-ranking");
       const source = "{state_name}";
+      const infoSource = "{info_content_name}";
       let loading = false;
+      let infoLoading = false;
+      let infoActiveIndex = 0;
       let lastState = null;
       let currentVisualUrl = "";
+      let pendingVisualUrl = "";
+      let pendingVisualToken = 0;
+      const infoFrames = [
+        document.getElementById("wb-info-frame-a"),
+        document.getElementById("wb-info-frame-b"),
+      ];
 
       const setStageVisibility = (visible) => {{
         stage.classList.toggle("is-hidden", !visible);
+        root.classList.toggle("wb-shell--stage-hidden", !visible);
+      }};
+
+      const buildInfoSource = () => `${{infoSource}}?v=${{Date.now()}}`;
+      const visibleInfoFrame = () => infoFrames[infoActiveIndex];
+      const hiddenInfoFrame = () => infoFrames[infoActiveIndex === 0 ? 1 : 0];
+
+      const primeInfoFrame = () => {{
+        const currentFrame = visibleInfoFrame();
+        if (!currentFrame.getAttribute("src")) {{
+          currentFrame.src = buildInfoSource();
+        }}
+      }};
+
+      const swapInfoFrame = () => {{
+        if (infoLoading) {{
+          return;
+        }}
+
+        infoLoading = true;
+        const nextFrame = hiddenInfoFrame();
+        const currentFrame = visibleInfoFrame();
+
+        const handleLoad = () => {{
+          nextFrame.removeEventListener("load", handleLoad);
+          nextFrame.removeEventListener("error", handleError);
+          nextFrame.classList.add("is-visible");
+          currentFrame.classList.remove("is-visible");
+          infoActiveIndex = infoActiveIndex === 0 ? 1 : 0;
+          infoLoading = false;
+        }};
+
+        const handleError = () => {{
+          nextFrame.removeEventListener("load", handleLoad);
+          nextFrame.removeEventListener("error", handleError);
+          infoLoading = false;
+        }};
+
+        nextFrame.addEventListener("load", handleLoad, {{ once: true }});
+        nextFrame.addEventListener("error", handleError, {{ once: true }});
+        nextFrame.src = buildInfoSource();
       }};
 
       const applyVisual = (visualUrl, bossName) => {{
         if (!visualUrl) {{
+          pendingVisualUrl = "";
+          pendingVisualToken += 1;
           currentVisualUrl = "";
           art.removeAttribute("src");
           art.alt = bossName || "";
@@ -993,19 +1270,44 @@ class DetailOverlayWriter:
         }}
 
         art.alt = bossName || "";
-        fallback.classList.add("is-hidden");
         if (visualUrl === currentVisualUrl && art.getAttribute("src")) {{
+          pendingVisualUrl = "";
+          fallback.classList.add("is-hidden");
           art.classList.remove("is-hidden");
           return;
         }}
+        if (visualUrl === pendingVisualUrl) {{
+          if (art.getAttribute("src")) {{
+            art.classList.remove("is-hidden");
+            fallback.classList.add("is-hidden");
+          }}
+          return;
+        }}
 
+        const hadVisibleArt = Boolean(currentVisualUrl && art.getAttribute("src"));
+        pendingVisualUrl = visualUrl;
+        const loadToken = ++pendingVisualToken;
         const preloader = new Image();
         preloader.onload = () => {{
+          if (loadToken !== pendingVisualToken || pendingVisualUrl !== visualUrl) {{
+            return;
+          }}
+          pendingVisualUrl = "";
           currentVisualUrl = visualUrl;
           art.src = visualUrl;
+          fallback.classList.add("is-hidden");
           art.classList.remove("is-hidden");
         }};
         preloader.onerror = () => {{
+          if (loadToken !== pendingVisualToken || pendingVisualUrl !== visualUrl) {{
+            return;
+          }}
+          pendingVisualUrl = "";
+          if (hadVisibleArt && art.getAttribute("src")) {{
+            fallback.classList.add("is-hidden");
+            art.classList.remove("is-hidden");
+            return;
+          }}
           currentVisualUrl = "";
           art.removeAttribute("src");
           art.classList.add("is-hidden");
@@ -1021,6 +1323,46 @@ class DetailOverlayWriter:
         const value = String(text || "").trim();
         element.textContent = value;
         element.classList.toggle("is-hidden", !value);
+      }};
+
+      const restartStageEffect = (className, durationMs = 820) => {{
+        if (!className) {{
+          return;
+        }}
+        stage.classList.remove(className);
+        void stage.offsetWidth;
+        stage.classList.add(className);
+        window.setTimeout(() => {{
+          stage.classList.remove(className);
+        }}, Math.max(120, Number(durationMs || 0)));
+      }};
+
+      const detectBossHit = (previousPayload, nextPayload) => {{
+        if (!previousPayload || !nextPayload) {{
+          return false;
+        }}
+
+        const previousBossId = String(previousPayload.bossId || previousPayload.bossName || "").trim();
+        const nextBossId = String(nextPayload.bossId || nextPayload.bossName || "").trim();
+        if (!previousBossId || !nextBossId || previousBossId !== nextBossId) {{
+          return false;
+        }}
+
+        const previousPhase = String(previousPayload.phase || "").trim();
+        const nextPhase = String(nextPayload.phase || "").trim();
+        if (!["active", "resolving"].includes(previousPhase) || !["active", "resolving"].includes(nextPhase)) {{
+          return false;
+        }}
+
+        const previousHp = Math.max(0, Number(previousPayload.hpCurrent || 0));
+        const nextHp = Math.max(0, Number(nextPayload.hpCurrent || 0));
+        if (previousHp > 0 && nextHp >= 0 && nextHp < previousHp) {{
+          return true;
+        }}
+
+        const previousHpPct = Math.max(0, Math.min(100, Number(previousPayload.hpPct || 0)));
+        const nextHpPct = Math.max(0, Math.min(100, Number(nextPayload.hpPct || 0)));
+        return previousHpPct > 0 && nextHpPct >= 0 && nextHpPct < previousHpPct;
       }};
 
       const deriveStageClasses = (payload) => {{
@@ -1089,9 +1431,10 @@ class DetailOverlayWriter:
           return;
         }}
 
+        const previousState = lastState;
         lastState = payload;
         const stageClasses = Array.isArray(payload.stageClasses) ? payload.stageClasses : [];
-        const derivedStageClasses = deriveStageClasses(payload);
+        const derivedStageClasses = stageClasses.length ? [] : deriveStageClasses(payload);
         const mergedStageClasses = Array.from(new Set(["wb-stage", ...stageClasses, ...derivedStageClasses]));
         stage.className = mergedStageClasses.join(" ").trim();
         const safeBossName = String(payload.bossName || "").trim() || "WORLD BOSS";
@@ -1108,10 +1451,42 @@ class DetailOverlayWriter:
         }}[safePhaseId] || "";
         const safeEventText = String(payload.eventText || "").trim();
         const safeEventKind = String(payload.eventKind || "").trim();
+        const safeEventClasses = Array.isArray(payload.eventClasses) && payload.eventClasses.length
+          ? payload.eventClasses
+          : [
+              "wb-stage__event",
+              safeEventKind ? `wb-stage__event--${{safeEventKind}}` : "",
+            ].filter(Boolean);
+        const safePresentationTrigger = String(payload.presentationTrigger || "").trim();
+        const safePresentationTone = String(payload.presentationTone || "").trim();
         const safeHpText = String(payload.hpText || "").trim();
         const safeHpPct = Math.max(0, Math.min(100, Number(payload.hpPct || 0)));
+        const safeTimeCritical = Boolean(payload.timeCritical);
         const safeRaceFocusActive = Boolean(payload.raceFocusActive);
         const safeRaceText = String(payload.raceText || "").trim();
+        const safeRankingChipText = String(payload.rankingChipText || "").trim() || (
+          safeRaceFocusActive && safeRaceText
+            ? `争い ${{safeRaceText}}`
+            : payload.rankingText
+              ? `順位 ${{String(payload.rankingText)}}`
+              : ""
+        );
+        const safeRankingChipClasses = Array.isArray(payload.rankingChipClasses) && payload.rankingChipClasses.length
+          ? payload.rankingChipClasses
+          : [
+              "wb-stage__chip",
+              safeRaceFocusActive && safeRaceText ? "wb-stage__chip--race" : "",
+            ].filter(Boolean);
+        if (safePresentationTrigger) {{
+          stage.classList.add(`wb-stage--trigger-${{safePresentationTrigger.replace(/_/g, "-")}}`);
+        }}
+        if (safePresentationTone) {{
+          stage.classList.add(`wb-stage--tone-${{safePresentationTone.replace(/_/g, "-")}}`);
+        }}
+        stage.classList.toggle("wb-stage--time-critical", safeTimeCritical);
+        if (detectBossHit(previousState, payload)) {{
+          restartStageEffect("wb-stage--boss-hit");
+        }}
 
         bossName.textContent = safeBossName;
         bossTitle.textContent = safeBossTitle;
@@ -1122,8 +1497,7 @@ class DetailOverlayWriter:
 
         eventBanner.textContent = safeEventText;
         eventBanner.className = [
-          "wb-stage__event",
-          safeEventKind ? `wb-stage__event--${{safeEventKind}}` : "",
+          ...safeEventClasses,
           !safeEventText ? "is-hidden" : "",
         ]
           .filter(Boolean)
@@ -1140,13 +1514,11 @@ class DetailOverlayWriter:
         );
         applyChip(
           rankingChip,
-          safeRaceFocusActive && safeRaceText
-            ? `争い ${{safeRaceText}}`
-            : payload.rankingText
-              ? `順位 ${{String(payload.rankingText)}}`
-              : "",
+          safeRankingChipText,
         );
-        rankingChip.classList.toggle("wb-stage__chip--race", safeRaceFocusActive && !!safeRaceText);
+        rankingChip.className = [...safeRankingChipClasses, !safeRankingChipText ? "is-hidden" : ""]
+          .filter(Boolean)
+          .join(" ");
 
         applyVisual(String(payload.visualUrl || ""), safeBossName);
         syncStaleVisibility();
@@ -1175,7 +1547,9 @@ class DetailOverlayWriter:
       }};
 
       loadState();
+      primeInfoFrame();
       window.setInterval(loadState, 1000);
+      window.setInterval(swapInfoFrame, 2000);
       window.setInterval(syncStaleVisibility, 1000);
     }})();
   </script>
@@ -1298,13 +1672,26 @@ class DetailOverlayWriter:
             "phaseLabel": state.phase_label if state else "",
             "eventText": state.event_text if state else "",
             "eventKind": state.event_kind if state else "",
+            "eventClasses": list(state.event_classes) if state else [],
+            "presentationTrigger": state.presentation_trigger if state else "",
+            "presentationTone": state.presentation_tone if state else "",
             "statusText": state.status_text if state else "",
             "hpText": state.hp_text if state else "",
+            "hpCurrent": state.hp_current if state else 0,
+            "hpMax": state.hp_max if state else 0,
             "hpPct": state.hp_pct if state else 0,
+            "timeRemainingSec": state.time_remaining_sec if state else 0,
+            "timeTotalSec": state.time_total_sec if state else 0,
+            "timeCritical": bool(state and state.time_critical),
             "participantsText": state.participants_text if state else "",
             "rankingText": state.ranking_text if state else "",
             "raceFocusActive": bool(state and state.race_focus_active),
             "raceText": state.race_text if state else "",
+            "leaderScore": state.leader_score if state else 0,
+            "runnerUpScore": state.runner_up_score if state else 0,
+            "leaderGap": state.leader_gap if state else 0,
+            "rankingChipText": state.ranking_chip_text if state else "",
+            "rankingChipClasses": list(state.ranking_chip_classes) if state else [],
             "stageClasses": list(state.stage_classes) if state else [],
             "visualUrl": state.visual_url if state else "",
         }
@@ -1492,6 +1879,75 @@ class DetailOverlayWriter:
                 return entry.value
         return ""
 
+    def _parse_int_value(self, value: str, *, minimum: int = 0) -> int:
+        try:
+            parsed = int(float(str(value or "").strip()))
+        except (TypeError, ValueError):
+            return minimum
+        return max(minimum, parsed)
+
+    def _build_world_boss_presentation_state(
+        self,
+        *,
+        phase: str,
+        phase_id: str,
+        event_kind: str,
+        race_focus_active: bool,
+        race_text: str,
+        time_remaining_sec: int,
+        time_total_sec: int,
+        time_critical: bool,
+        leader_gap: int,
+        result_text: str,
+    ) -> tuple[str, str]:
+        safe_phase = str(phase or "").strip()
+        safe_phase_id = str(phase_id or "").strip()
+        safe_event_kind = str(event_kind or "").strip()
+        safe_result_text = str(result_text or "").strip()
+        safe_race_text = str(race_text or "").strip()
+        phase_elapsed_sec = max(0, time_total_sec - time_remaining_sec) if time_total_sec > 0 else 0
+
+        if safe_phase == "announce":
+            return "boss_spawn", "spotlight"
+        if safe_phase == "recruiting":
+            if safe_event_kind == "recruiting" and phase_elapsed_sec <= 5 and not time_critical:
+                return "boss_spawn", "spotlight"
+            if time_critical:
+                return "entry_last_call", "warning"
+            return "entry_open", "notice"
+        if safe_phase == "active":
+            close_race = race_focus_active and bool(safe_race_text) and leader_gap <= 10
+            if safe_event_kind == "start" and phase_elapsed_sec <= 8:
+                return "battle_start", "spotlight"
+            if safe_phase_id == "last_stand":
+                if close_race:
+                    return "last_stand_close_race", "danger"
+                return "last_stand", "danger"
+            if time_remaining_sec <= 10:
+                return "finish_countdown", "danger"
+            if close_race:
+                return "close_race", "spotlight"
+            if time_critical:
+                return "last_call", "warning"
+            if safe_event_kind in {"aoe", "critical", "down", "enrage"}:
+                return f"event_{safe_event_kind}", "danger"
+            if safe_event_kind == "recover":
+                return "event_recover", "recover"
+            return "battle", "combat"
+        if safe_phase == "resolving":
+            if "討伐成功" in safe_result_text:
+                return "victory", "victory"
+            if "時間切れ" in safe_result_text:
+                return "timeout", "timeout"
+            return "resolving", "muted"
+        if safe_phase == "cooldown":
+            if "討伐成功" in safe_result_text:
+                return "victory", "victory"
+            if "時間切れ" in safe_result_text:
+                return "timeout", "timeout"
+            return "cooldown", "muted"
+        return "idle", "idle"
+
     def _collect_section_values(self, entries: List[OverlayEntry], section_name: str) -> List[str]:
         values: List[str] = []
         in_section = False
@@ -1667,7 +2123,15 @@ class DetailOverlayWriter:
             html_dir / "assets" / visual_path,
             html_dir / "world_boss" / visual_path,
             html_dir / "assets" / "world_boss" / visual_path,
+            html_dir.parent / "assets" / visual_path,
+            html_dir.parent / "assets" / "world_boss" / visual_path,
         ]
+
+    def _build_world_boss_visual_relative_url(self, html_dir: Path, candidate_path: Path) -> str:
+        relative_path = Path(
+            os.path.relpath(candidate_path.resolve(), start=html_dir.resolve())
+        ).as_posix()
+        return quote(relative_path, safe="/:._-%")
 
     def _resolve_world_boss_visual_url(self, *, boss_id: str = "", boss_name: str = "") -> str:
         html_dir = Path(self.html_path).resolve().parent
@@ -1709,6 +2173,18 @@ class DetailOverlayWriter:
                     for extension in extensions
                 ]
             )
+            candidate_paths.extend(
+                [
+                    html_dir.parent / "assets" / f"world_boss_visual_{safe_boss_id}{extension}"
+                    for extension in extensions
+                ]
+            )
+            candidate_paths.extend(
+                [
+                    html_dir.parent / "assets" / "world_boss" / f"{safe_boss_id}{extension}"
+                    for extension in extensions
+                ]
+            )
 
         candidate_paths = [
             *candidate_paths,
@@ -1722,13 +2198,16 @@ class DetailOverlayWriter:
             html_dir / "assets" / "world_boss_visual.webp",
             html_dir / "assets" / "world_boss_visual.jpg",
             html_dir / "assets" / "world_boss_visual.jpeg",
+            html_dir.parent / "assets" / "world_boss_visual.png",
+            html_dir.parent / "assets" / "world_boss_visual.webp",
+            html_dir.parent / "assets" / "world_boss_visual.jpg",
+            html_dir.parent / "assets" / "world_boss_visual.jpeg",
         ]
 
         for candidate_path in candidate_paths:
             if not candidate_path.is_file():
                 continue
-            relative_path = candidate_path.relative_to(html_dir).as_posix()
-            return quote(relative_path, safe="/:._-%")
+            return self._build_world_boss_visual_relative_url(html_dir, candidate_path)
 
         return ""
 
@@ -1753,10 +2232,13 @@ class DetailOverlayWriter:
         return False
 
     def _build_world_boss_state(self, title: str, entries: List[OverlayEntry]) -> WorldBossOverlayState:
-        wb_heading = self._find_first_kv_value(entries, "WB")
-        result_text = self._find_first_kv_value(entries, "結果")
-        status_text = self._find_first_kv_value(entries, "状態")
-        hp_text = self._find_first_kv_value(entries, "HP")
+        explicit_boss_name = self._find_first_meta_value(entries, "wb_boss_name")
+        explicit_boss_title = self._find_first_meta_value(entries, "wb_boss_title")
+        explicit_heading = self._find_first_meta_value(entries, "wb_heading")
+        wb_heading = explicit_heading or self._find_first_kv_value(entries, "WB")
+        result_text = self._find_first_meta_value(entries, "wb_result_text") or self._find_first_kv_value(entries, "結果")
+        status_text = self._find_first_meta_value(entries, "wb_status_text") or self._find_first_kv_value(entries, "状態")
+        hp_text = self._find_first_meta_value(entries, "wb_hp_text") or self._find_first_kv_value(entries, "HP")
         participants_text = self._find_first_meta_value(entries, "wb_participants_text") or self._find_first_kv_value(
             entries, "参加人数"
         )
@@ -1775,9 +2257,21 @@ class DetailOverlayWriter:
             entries, "イベント"
         )
         explicit_show_stage = self._find_first_meta_value(entries, "wb_show_stage")
-        explicit_phase_label = self._find_first_kv_value(entries, "フェーズ")
+        explicit_phase_label = self._find_first_meta_value(entries, "wb_phase_label") or self._find_first_kv_value(entries, "フェーズ")
+        explicit_time_remaining_sec = self._find_first_meta_value(entries, "wb_time_remaining_sec")
+        explicit_time_total_sec = self._find_first_meta_value(entries, "wb_time_total_sec")
+        explicit_time_critical = self._find_first_meta_value(entries, "wb_time_critical")
+        explicit_presentation_trigger = self._find_first_meta_value(entries, "wb_presentation_trigger")
+        explicit_presentation_tone = self._find_first_meta_value(entries, "wb_presentation_tone")
+        explicit_leader_score = self._find_first_meta_value(entries, "wb_leader_score")
+        explicit_runner_up_score = self._find_first_meta_value(entries, "wb_runner_up_score")
+        explicit_leader_gap = self._find_first_meta_value(entries, "wb_leader_gap")
         recent_logs = self._collect_section_values(entries, "直近ログ")
-        boss_name, boss_title = self._split_boss_heading(wb_heading)
+        if explicit_boss_name or explicit_boss_title:
+            boss_name = str(explicit_boss_name or "").strip() or "WORLD BOSS"
+            boss_title = str(explicit_boss_title or "").strip()
+        else:
+            boss_name, boss_title = self._split_boss_heading(wb_heading)
 
         if not wb_heading and result_text:
             boss_name = result_text.split(" / ", 1)[0].strip() or "WORLD BOSS"
@@ -1801,12 +2295,14 @@ class DetailOverlayWriter:
         )
         phase_label_map = {
             "idle": "",
+            "announce": "BOSS INCOMING",
             "entry_open": "ENTRY OPEN",
             "phase_1": "PHASE 1",
             "phase_2": "PHASE 2",
             "last_stand": "LAST STAND",
             "boss_down": "BOSS DOWN",
             "time_over": "TIME OVER",
+            "resolving": "RESULT",
             "cooldown": "COOLDOWN",
         }
         phase_label = (
@@ -1835,20 +2331,33 @@ class DetailOverlayWriter:
         stage_classes: List[str] = ["wb-stage--idle", self._get_world_boss_theme_class(boss_id)]
         safe_phase = str(phase or "").strip()
         safe_phase_id = str(phase_id or "").strip()
-        if safe_phase == "recruiting":
+        if safe_phase == "announce":
+            stage_classes.append("wb-stage--announce")
+        elif safe_phase == "recruiting":
             stage_classes.append("wb-stage--recruiting")
         elif safe_phase == "active":
             stage_classes.append("wb-stage--active")
+        elif safe_phase == "resolving":
+            if "討伐成功" in result_text or safe_phase_id == "boss_down":
+                stage_classes.append("wb-stage--victory")
+            elif "時間切れ" in result_text or safe_phase_id == "time_over":
+                stage_classes.append("wb-stage--timeout")
+            else:
+                stage_classes.append("wb-stage--resolving")
         elif safe_phase == "cooldown" and ("討伐成功" in result_text or "討伐成功" in phase_blob):
             stage_classes.append("wb-stage--victory")
         elif safe_phase == "cooldown" and ("時間切れ" in result_text or "時間切れ" in phase_blob):
             stage_classes.append("wb-stage--timeout")
         elif safe_phase == "cooldown":
             stage_classes.append("wb-stage--cooldown")
+        elif "出現予告" in status_text:
+            stage_classes.append("wb-stage--announce")
         elif "募集中" in status_text or "ワールドボス出現" in title:
             stage_classes.append("wb-stage--recruiting")
         elif "戦闘中" in status_text:
             stage_classes.append("wb-stage--active")
+        elif "結果確定中" in status_text:
+            stage_classes.append("wb-stage--resolving")
         elif "討伐成功" in result_text or "討伐成功" in phase_blob:
             stage_classes.append("wb-stage--victory")
         elif "時間切れ" in result_text or "時間切れ" in phase_blob:
@@ -1869,6 +2378,8 @@ class DetailOverlayWriter:
             keyword in phase_blob for keyword in ("WB攻撃", "全体攻撃", "戦闘開始", "スキル発動")
         ):
             stage_classes.append("wb-stage--attack")
+        if event_kind == "announce":
+            stage_classes.append("wb-stage--recruiting-flash")
         if event_kind == "enrage" or safe_phase_id == "last_stand" or any(
             keyword in phase_blob for keyword in ("激昂", "怒りの全体攻撃")
         ) or (0 < hp_pct <= 25):
@@ -1887,14 +2398,58 @@ class DetailOverlayWriter:
             "timeout": "wb-stage--timeout-flash",
             "ranking": "wb-stage--ranking",
             "recruiting": "wb-stage--recruiting-flash",
+            "announce": "wb-stage--recruiting-flash",
         }
         event_class = event_class_map.get(event_kind)
         if event_class:
             stage_classes.append(event_class)
         race_focus_active = str(explicit_race_focus_active or "").strip() not in {"", "0", "false", "False"}
         race_text = str(explicit_race_text or "").strip()
+        time_remaining_sec = self._parse_int_value(explicit_time_remaining_sec)
+        time_total_sec = self._parse_int_value(explicit_time_total_sec)
+        time_critical = str(explicit_time_critical or "").strip() not in {"", "0", "false", "False"}
+        leader_score = self._parse_int_value(explicit_leader_score)
+        runner_up_score = self._parse_int_value(explicit_runner_up_score)
+        leader_gap = self._parse_int_value(explicit_leader_gap)
+        presentation_trigger, presentation_tone = (
+            str(explicit_presentation_trigger or "").strip(),
+            str(explicit_presentation_tone or "").strip(),
+        )
+        if not presentation_trigger or not presentation_tone:
+            fallback_trigger, fallback_tone = self._build_world_boss_presentation_state(
+                phase=safe_phase,
+                phase_id=safe_phase_id,
+                event_kind=event_kind,
+                race_focus_active=race_focus_active,
+                race_text=race_text,
+                time_remaining_sec=time_remaining_sec,
+                time_total_sec=time_total_sec,
+                time_critical=time_critical,
+                leader_gap=leader_gap,
+                result_text=result_text,
+            )
+            if not presentation_trigger:
+                presentation_trigger = fallback_trigger
+            if not presentation_tone:
+                presentation_tone = fallback_tone
         if race_focus_active and race_text:
             stage_classes.append("wb-stage--race-focus")
+        if time_critical:
+            stage_classes.append("wb-stage--time-critical")
+        if presentation_trigger:
+            stage_classes.append(f"wb-stage--trigger-{presentation_trigger.replace('_', '-')}")
+        if presentation_tone:
+            stage_classes.append(f"wb-stage--tone-{presentation_tone.replace('_', '-')}")
+        event_classes = ["wb-stage__event"]
+        if event_kind:
+            event_classes.append(f"wb-stage__event--{event_kind}")
+        ranking_chip_classes = ["wb-stage__chip"]
+        ranking_chip_text = ""
+        if race_focus_active and race_text:
+            ranking_chip_text = f"争い {race_text}"
+            ranking_chip_classes.append("wb-stage__chip--race")
+        elif ranking_text:
+            ranking_chip_text = f"順位 {ranking_text}"
 
         deduped_classes: List[str] = []
         for stage_class in stage_classes:
@@ -1921,6 +2476,9 @@ class DetailOverlayWriter:
             hp_current=hp_current,
             hp_max=hp_max,
             hp_pct=hp_pct,
+            time_remaining_sec=time_remaining_sec,
+            time_total_sec=time_total_sec,
+            time_critical=time_critical,
             participants_text=participants_text,
             ranking_text=ranking_text,
             recent_logs=recent_logs[-3:],
@@ -1930,8 +2488,16 @@ class DetailOverlayWriter:
             phase_label=phase_label,
             event_text=event_text,
             event_kind=event_kind,
+            event_classes=event_classes,
+            presentation_trigger=presentation_trigger,
+            presentation_tone=presentation_tone,
             race_focus_active=race_focus_active,
             race_text=race_text,
+            leader_score=leader_score,
+            runner_up_score=runner_up_score,
+            leader_gap=leader_gap,
+            ranking_chip_text=ranking_chip_text,
+            ranking_chip_classes=ranking_chip_classes,
             visual_url=(
                 self._resolve_world_boss_visual_url(
                     boss_id=boss_id,
@@ -1948,6 +2514,10 @@ class DetailOverlayWriter:
         *,
         include_hud: bool = True,
     ) -> str:
+        safe_phase = str(state.phase or "").strip()
+        safe_phase_id = str(state.phase_id or "").strip()
+        is_result_stage = safe_phase in {"resolving", "cooldown"} or safe_phase_id in {"boss_down", "time_over"}
+
         if state.visual_url:
             portrait_markup = (
                 f"<img class=\"wb-stage__art\" src=\"{escape(state.visual_url)}\" "
@@ -1962,6 +2532,12 @@ class DetailOverlayWriter:
             )
 
         chips: List[str] = []
+        if is_result_stage and state.result_text:
+            chips.append(
+                "<span class=\"wb-stage__chip wb-stage__chip--result\">"
+                f"{escape(state.result_text)}"
+                "</span>"
+            )
         if state.status_text:
             chips.append(
                 "<span class=\"wb-stage__chip\">"
@@ -1974,16 +2550,10 @@ class DetailOverlayWriter:
                 f"参加 {escape(state.participants_text)}"
                 "</span>"
             )
-        if state.race_focus_active and state.race_text:
+        if state.ranking_chip_text:
             chips.append(
-                "<span class=\"wb-stage__chip wb-stage__chip--race\">"
-                f"争い {escape(state.race_text)}"
-                "</span>"
-            )
-        elif state.ranking_text:
-            chips.append(
-                "<span class=\"wb-stage__chip\">"
-                f"順位 {escape(state.ranking_text)}"
+                f"<span class=\"{' '.join(escape(css_class) for css_class in state.ranking_chip_classes)}\">"
+                f"{escape(state.ranking_chip_text)}"
                 "</span>"
             )
         if not chips and state.result_text:
@@ -2022,7 +2592,11 @@ class DetailOverlayWriter:
                     "</div>"
                 )
 
-        subtitle = state.boss_title or state.result_text or "チャットで参戦"
+        subtitle = (
+            state.result_text
+            if is_result_stage and state.result_text
+            else state.boss_title or state.result_text or "チャットで参戦"
+        )
         stage_class_parts = ["wb-stage", *state.stage_classes]
         if not include_hud:
             stage_class_parts.append("wb-stage--visual-only")
@@ -2037,13 +2611,9 @@ class DetailOverlayWriter:
             )
         event_markup = ""
         if state.event_text:
-            event_kind_class = (
-                f" wb-stage__event--{escape(state.event_kind)}"
-                if state.event_kind
-                else ""
-            )
+            event_classes = state.event_classes or ["wb-stage__event"]
             event_markup = (
-                f"<div class=\"wb-stage__event{event_kind_class}\">"
+                f"<div class=\"{' '.join(escape(css_class) for css_class in event_classes)}\">"
                 f"{escape(state.event_text)}"
                 "</div>"
             )
@@ -2933,7 +3503,8 @@ class DetailOverlayWriter:
     }}
 
     .wb-stage__event--start,
-    .wb-stage__event--recruiting {{
+    .wb-stage__event--recruiting,
+    .wb-stage__event--announce {{
       background: linear-gradient(180deg, rgba(20, 68, 112, 0.84), rgba(14, 34, 62, 0.90));
       border-color: rgba(180, 224, 255, 0.28);
     }}
@@ -3018,6 +3589,24 @@ class DetailOverlayWriter:
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
     }}
 
+    .wb-stage__chip--race {{
+      background: linear-gradient(180deg, rgba(92, 68, 20, 0.92), rgba(54, 38, 12, 0.96));
+      border-color: rgba(255, 219, 138, 0.30);
+      color: #fff7e8;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 10px 24px rgba(255, 176, 82, 0.16);
+    }}
+
+    .wb-stage__chip--result {{
+      background: linear-gradient(180deg, rgba(126, 92, 20, 0.94), rgba(72, 46, 10, 0.98));
+      border-color: rgba(255, 225, 150, 0.34);
+      color: #fff8e8;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.14),
+        0 12px 28px rgba(255, 195, 92, 0.18);
+    }}
+
     .wb-stage__logbox {{
       margin-top: 16px;
       padding: 12px 14px;
@@ -3055,6 +3644,24 @@ class DetailOverlayWriter:
       animation-duration: 7.2s;
     }}
 
+    .wb-stage--announce .wb-stage__panel {{
+      border-color: rgba(255, 230, 176, 0.26);
+      box-shadow:
+        0 30px 80px rgba(18, 12, 26, 0.30),
+        0 0 54px rgba(255, 214, 118, 0.18),
+        inset 0 0 0 1px rgba(255, 240, 208, 0.08);
+    }}
+
+    .wb-stage--announce .wb-stage__phase,
+    .wb-stage--announce .wb-stage__event {{
+      border-color: rgba(255, 229, 166, 0.34);
+      box-shadow: 0 16px 34px rgba(255, 196, 92, 0.16);
+    }}
+
+    .wb-stage--announce .wb-stage__motion {{
+      animation-duration: 6.6s;
+    }}
+
     .wb-stage--attack .wb-stage__pose {{
       animation: wb-attack 2.6s cubic-bezier(0.24, 0.78, 0.22, 1.0) infinite;
       animation-delay: var(--wb-delay-attack);
@@ -3071,6 +3678,35 @@ class DetailOverlayWriter:
 
     .wb-stage--impacting .wb-stage__impact {{
       animation: wb-impact-flash 1.4s cubic-bezier(0.18, 0.88, 0.22, 1.0) infinite;
+    }}
+
+    .wb-stage--boss-hit .wb-stage__pose {{
+      animation: wb-boss-hit-shudder 0.52s cubic-bezier(0.22, 0.78, 0.18, 1.0) 1;
+    }}
+
+    .wb-stage--boss-hit .wb-stage__backdrop {{
+      opacity: 0.96;
+      filter: blur(38px) saturate(1.08);
+    }}
+
+    .wb-stage--boss-hit .wb-stage__aura {{
+      opacity: 0.96;
+      transform: translate3d(0, 0, 0) scale(1.05);
+    }}
+
+    .wb-stage--boss-hit .wb-stage__impact {{
+      background:
+        radial-gradient(circle, rgba(255, 251, 236, 0.98) 0%, rgba(255, 224, 156, 0.62) 24%, rgba(255, 170, 92, 0.34) 46%, transparent 72%);
+      filter: blur(11px);
+      animation: wb-impact-flash 0.92s cubic-bezier(0.18, 0.88, 0.22, 1.0) 1;
+      opacity: 0.96;
+    }}
+
+    .wb-stage--boss-hit .wb-stage__panel {{
+      box-shadow:
+        0 30px 80px rgba(24, 12, 26, 0.32),
+        0 0 64px rgba(255, 214, 118, 0.22),
+        inset 0 0 0 1px rgba(255, 242, 204, 0.16);
     }}
 
     .wb-stage--phase-2 .wb-stage__panel {{
@@ -3097,12 +3733,100 @@ class DetailOverlayWriter:
       letter-spacing: 0.22em;
     }}
 
+    .wb-stage--resolving .wb-stage__panel {{
+      border-color: rgba(208, 214, 236, 0.26);
+      box-shadow:
+        0 30px 80px rgba(18, 14, 28, 0.28),
+        0 0 48px rgba(154, 170, 214, 0.14),
+        inset 0 0 0 1px rgba(244, 246, 255, 0.08);
+    }}
+
+    .wb-stage--resolving .wb-stage__event,
+    .wb-stage--resolving .wb-stage__phase {{
+      border-color: rgba(208, 214, 236, 0.30);
+      box-shadow: 0 16px 34px rgba(124, 138, 176, 0.14);
+    }}
+
+    .wb-stage--resolving .wb-stage__logbox {{
+      background: rgba(20, 18, 30, 0.50);
+      border-color: rgba(214, 220, 240, 0.20);
+    }}
+
     .wb-stage--race-focus .wb-stage__status {{
       border-color: rgba(255, 221, 154, 0.28);
       box-shadow:
         0 24px 54px rgba(12, 10, 24, 0.22),
         0 0 0 1px rgba(255, 221, 154, 0.08),
         inset 0 1px 0 rgba(255, 250, 224, 0.14);
+    }}
+
+    .wb-stage--time-critical .wb-stage__panel {{
+      box-shadow:
+        0 30px 80px rgba(40, 8, 18, 0.36),
+        0 0 62px rgba(255, 108, 90, 0.22),
+        inset 0 0 0 1px rgba(255, 196, 170, 0.14);
+    }}
+
+    .wb-stage--tone-warning .wb-stage__phase,
+    .wb-stage--tone-warning .wb-stage__event {{
+      border-color: rgba(255, 214, 140, 0.34);
+      box-shadow: 0 16px 34px rgba(255, 176, 84, 0.18);
+    }}
+
+    .wb-stage--tone-danger .wb-stage__event,
+    .wb-stage--tone-danger .wb-stage__phase {{
+      border-color: rgba(255, 168, 150, 0.36);
+      box-shadow: 0 16px 34px rgba(255, 104, 90, 0.20);
+    }}
+
+    .wb-stage--tone-spotlight .wb-stage__chip--race {{
+      border-color: rgba(255, 225, 154, 0.38);
+      box-shadow: 0 12px 28px rgba(255, 207, 102, 0.20);
+    }}
+
+    .wb-stage--trigger-boss-spawn .wb-stage__panel,
+    .wb-stage--trigger-battle-start .wb-stage__panel {{
+      box-shadow:
+        0 30px 80px rgba(18, 12, 26, 0.32),
+        0 0 58px rgba(255, 214, 118, 0.22),
+        inset 0 0 0 1px rgba(255, 238, 198, 0.14);
+    }}
+
+    .wb-stage--trigger-entry-open .wb-stage__panel {{
+      box-shadow:
+        0 30px 80px rgba(18, 12, 26, 0.30),
+        0 0 52px rgba(255, 223, 132, 0.18),
+        inset 0 0 0 1px rgba(255, 240, 208, 0.12);
+    }}
+
+    .wb-stage--trigger-entry-last-call .wb-stage__panel,
+    .wb-stage--trigger-finish-countdown .wb-stage__panel,
+    .wb-stage--trigger-last-stand-close-race .wb-stage__panel {{
+      box-shadow:
+        0 30px 80px rgba(32, 10, 22, 0.34),
+        0 0 60px rgba(255, 124, 88, 0.22),
+        inset 0 0 0 1px rgba(255, 214, 190, 0.14);
+    }}
+
+    .wb-stage--trigger-boss-spawn .wb-stage__event,
+    .wb-stage--trigger-battle-start .wb-stage__event,
+    .wb-stage--trigger-entry-open .wb-stage__event,
+    .wb-stage--trigger-entry-last-call .wb-stage__event,
+    .wb-stage--trigger-finish-countdown .wb-stage__event,
+    .wb-stage--trigger-last-stand-close-race .wb-stage__event {{
+      animation: wb-banner-flash 1.05s ease-in-out infinite alternate;
+    }}
+
+    .wb-stage--tone-victory .wb-stage__phase,
+    .wb-stage--tone-victory .wb-stage__event {{
+      border-color: rgba(255, 226, 146, 0.36);
+      box-shadow: 0 16px 34px rgba(255, 202, 84, 0.20);
+    }}
+
+    .wb-stage--tone-timeout .wb-stage__phase,
+    .wb-stage--tone-timeout .wb-stage__event {{
+      border-color: rgba(188, 200, 224, 0.28);
+      box-shadow: 0 16px 34px rgba(110, 124, 168, 0.16);
     }}
 
     .wb-stage--aoe .wb-stage__impact {{

@@ -1,6 +1,7 @@
 # Data Layout
 
 - `balance/`: RPG balance tuning files
+- `assets/`: GitHub に含める共有アセット。WB 画像は `assets/world_boss/` に置く
 - `runtime/`: bot save data such as `botdata.json`
 
 Manual backups are stored outside the source tree at
