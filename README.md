@@ -13,6 +13,7 @@
 - `config.py`: 後方互換用の設定ラッパー
 - `rpg.py`: 後方互換用のインポートラッパー
 - `data/`: 実行データとバランスデータ
+- `docs/implementation_manual.md`: 実装者向けの構成と拡張手順
 - `docs/stream_description_help.md`: 配信概要欄やパネルに貼れるユーザー向けヘルプ
 - `docs/discord_response_manual.md`: Discord で詳しい返答を読むための視聴者向けマニュアル
 - `tests/`: 退避情報とデータ正規化の回帰確認

@@ -15,6 +15,7 @@ data/runtime/
 # Public docs only
 docs/*
 !docs/discord_response_manual.md
+!docs/implementation_manual.md
 !docs/stream_description_help.md
 
 # Tooling output
