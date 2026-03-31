@@ -30,8 +30,9 @@
 
 - `bot.py`, `app_config.py`, `bot_components/`, `rpg_core/` がチャットボット本体です。通常の改修はこの範囲を見れば足ります。
 - `data/balance/` は手で編集する設定、`data/runtime/` は実行中に更新される保存先です。
-- 手動バックアップはソースツリー外の `C:\Users\adp46\Documents\バックアップ\chatbot_backups` に退避します。
-- `layerdivider/` は同じワークスペースに置いてある独立ツールです。チャットボット本体とは別物として扱い、移動や削除は別作業に分けるのが安全です。
+- 必要ならバックアップはソースツリー外の任意の場所に退避してください。
+- `docs/` の直下にある `.md` は共有向けドキュメントです。`docs/logs/` と `docs/notes/` はローカル運用向けの作業フォルダとして既定では Git 管理対象外です。
+- `layerdivider/` は独立したオプション用サブモジュールです。チャットボット本体のセットアップには必須ではありません。
 - `venv/`, `layerdivider/venv/`, 各 `__pycache__/` は生成物です。不要なら削除して再生成できます。
 
 ## RPG バランス用ファイル
@@ -42,13 +43,23 @@
 - `data/runtime/botdata.json`: プレイヤー状態の保存データ
 - `data/runtime/obs_detail_overlay.html`: OBS Browser Source 用の詳細ビュー
 - `data/runtime/obs_detail_overlay.txt`: OBS Text Source 用の生ログ
-- `C:\Users\adp46\Documents\バックアップ\chatbot_backups`: 手動で保管するローカルバックアップ
+- ソースツリー外の任意バックアップ先: 手動で保管するローカルバックアップ
 
 バランスを変更したい場合はこれらの JSON を編集し、ボットを再起動してください。
 
 ## セットアップ
 
 最短導線は `dev.py` を使う方法です。`python` が使えれば、依存導入、確認、テスト、起動を同じ入口に揃えられます。
+
+GitHub から clone した直後は、次の流れで始めるのが最短です。
+
+```powershell
+git clone <repository-url>
+cd <repository-directory>
+python dev.py setup
+Copy-Item .env.example .env
+python dev.py doctor
+```
 
 ```powershell
 python dev.py setup
@@ -118,6 +129,12 @@ python dev.py test
 ```
 
 直接実行する場合は `.\venv\Scripts\python.exe -m unittest discover -s tests -v` です。普段の入口を `python dev.py ...` に揃えると、`python` と `venv` 外の実行が混ざりにくくなります。
+
+`layerdivider/` も使いたい場合だけ、追加で次を実行してください。
+
+```powershell
+git submodule update --init --recursive
+```
 
 ## ローカル確認
 

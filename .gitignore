@@ -12,8 +12,10 @@ botdata.json
 data/runtime/
 バックアップ/
 
-# Documentation (Note articles, etc.)
-docs/
+# Public docs only
+docs/*
+!docs/discord_response_manual.md
+!docs/stream_description_help.md
 
 # Tooling output
 layerdivider/output/
