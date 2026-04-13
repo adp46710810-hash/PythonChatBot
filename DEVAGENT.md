@@ -47,3 +47,8 @@ GEMINI_TIMEOUT_SEC=60
 - 実行コマンドは `agent.project.yaml` の `allowed_commands` に完全一致したものだけ許可
 - `.env` やランタイム保存先は profile でブロック
 - Gemini や外部AIへ相談する場合も、最終判断は人間または Codex が行う
+
+## AI連携デモ
+
+2026-03-30: GitHub PR流でCopilot/Codex/Geminiと連携開発するデモを実施。
+WBオーバーレイの meta 情報管理と state payload 拡張を例に、AIツール活用のワークフローを検証中。
